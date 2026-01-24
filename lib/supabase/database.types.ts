@@ -24,7 +24,6 @@ export type Database = {
           is_configured: boolean | null
           rate_limit: number | null
           rate_limit_hit_message: string | null
-          system_prompt: string | null
         }
         Insert: {
           active?: boolean | null
@@ -35,7 +34,6 @@ export type Database = {
           is_configured?: boolean | null
           rate_limit?: number | null
           rate_limit_hit_message?: string | null
-          system_prompt?: string | null
         }
         Update: {
           active?: boolean | null
@@ -46,7 +44,6 @@ export type Database = {
           is_configured?: boolean | null
           rate_limit?: number | null
           rate_limit_hit_message?: string | null
-          system_prompt?: string | null
         }
         Relationships: [
           {

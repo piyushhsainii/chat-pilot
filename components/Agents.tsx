@@ -1,26 +1,17 @@
 "use client";
 import { useState } from "react";
 import BotCard from "./BotCard";
-import { AnswerStyle, BotTone } from "@/lib/types";
 import NewAgentStepper from "./NewAgentStepper";
 import { motion } from "framer-motion";
+import { useDashboardStore } from "@/store/dashboardStore";
 
-const DEFAULT_BOT = {
-  id: "bot-persistent-test",
-  workspaceId: "Demo Workspace",
-  name: "Global Support Bot",
-  systemPrompt: "You are an AI assistant for the global support team.",
-  tone: BotTone.PROFESSIONAL,
-  status: "active",
-  answerStyle: AnswerStyle.DETAILED,
-  fallbackBehavior: "I cannot find that in the documents.",
-  embedSettings: { theme: "light", primaryColor: "#6366f1" },
-};
+
 
 const Agents = () => {
-  const [bots, setbots] = useState([DEFAULT_BOT]);
-  const [selectedBot, setSelectedBot] = useState(DEFAULT_BOT);
+  const { bots } = useDashboardStore()
   const [showNewAgent, setShowNewAgent] = useState(false);
+
+  console.log(`check`, bots)
 
   return (
     <>
@@ -72,8 +63,8 @@ const Agents = () => {
           </motion.button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bots.map((bot) => (
-            <BotCard key={bot.id} bot={bot} onSelect={setSelectedBot} />
+          {bots && bots.map((bot) => (
+            <BotCard key={bot.id} bot={bot} />
           ))}
         </div>
       </div>

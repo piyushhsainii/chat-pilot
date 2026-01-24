@@ -17,3 +17,24 @@ export const ALLOWED_MODELS = [
     expensive: true,
   },
 ];
+
+export const TEMPLATES = {
+  faq: {
+    label: "FAQ Bot",
+    systemPrompt:
+      "You answer frequently asked questions clearly and concisely using the provided knowledge base.",
+    fallback: "I couldn’t find that in the FAQ. Please contact support.",
+  },
+  support: {
+    label: "Support Agent",
+    systemPrompt:
+      "You are a professional support agent. Be empathetic, concise, and solution-oriented.",
+    fallback: "I’m not sure about that yet. Let me connect you to support.",
+  },
+  general: {
+    label: "General Assistant",
+    systemPrompt:
+      "You are a helpful AI assistant that answers user questions politely and clearly.",
+    fallback: "I’m not sure about that. Could you rephrase?",
+  },
+};

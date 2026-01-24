@@ -8,22 +8,20 @@ export async function POST(req: NextRequest) {
   try {
     const { bot, query, contextChunks } = await req.json();
 
-    const context = contextChunks.join("\n\n");
+    const context = contextChunks;
 
     const systemInstruction = `
 You are an AI assistant for ${bot.name}.
 Tone: ${bot.tone}
-Answer Style: ${bot.answerStyle}
 
 Rules:
 - Answer ONLY from the provided context.
-- If the answer is not in the context, say: "${bot.fallbackBehavior}"
+- If the answer is not in the context, say: "${bot.fallback_behavior}"
 - Tone should strictly be ${bot.tone}.
-- Provide ${bot.answerStyle} answers.
 
 Context:
 ${context}
-    `.trim();
+`.trim();
 
     const result = await streamText({
       model: openai(bot.model || "gpt-4o-mini"),
@@ -39,6 +37,8 @@ ${context}
 
         try {
           for await (const textPart of result.textStream) {
+            if (!textPart) continue;
+
             const data = JSON.stringify({ content: textPart });
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           }

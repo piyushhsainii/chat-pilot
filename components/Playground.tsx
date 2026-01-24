@@ -38,7 +38,7 @@ export const Playground = ({
   }>({
     [selectedBot.id]: [{
       role: "bot",
-      text: selectedBot.widgets?.greeting_message ?? "",
+      text: selectedBot.widgets?.greeting_message!,
       isStreaming: false
     }]
   });
@@ -63,9 +63,28 @@ export const Playground = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  console.log(`check`, selectedBot.widgets)
+
   useEffect(() => {
     scrollToBottom();
   }, [currentMessages]);
+
+  useEffect(() => {
+    setEditableBot({
+      name: selectedBot.name,
+      systemPrompt: selectedBot.system_prompt,
+      tone: selectedBot.tone,
+      answerStyle: selectedBot.tone,
+      fallbackBehavior: selectedBot.fallback_behavior,
+    })
+    setMessages({
+      [selectedBot.id]: [{
+        role: "bot",
+        text: selectedBot.widgets?.greeting_message!,
+        isStreaming: false
+      }]
+    });
+  }, [selectedBot])
 
   const handleSend = async () => {
     if (!input.trim() || !selectedBot || isStreaming) return;
@@ -153,7 +172,7 @@ export const Playground = ({
         bot,
         query,
         // NEED TYO
-        contextChunks: bot.system_prompt || [],
+        contextChunks: bot.system_prompt,
       }),
       signal,
     });
