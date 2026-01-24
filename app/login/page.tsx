@@ -73,6 +73,17 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     }
   };
 
+  const isAlreadyLoggedIn = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      window.location.href = "/";
+    }
+  };
+
+  useEffect(() => {
+    isAlreadyLoggedIn();
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-slate-50 flex items-center justify-center p-4 md:p-10 relative overflow-hidden">
       {/* Background Decor */}

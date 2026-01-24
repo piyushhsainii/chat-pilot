@@ -15,9 +15,6 @@ export default async function RootLayout({
     data: { session },
   } = await supabase.auth.getSession();
   const user = session?.user;
-  console.log(`USER`, user);
-
-  // 🔒 Redirect if not logged in
   if (!user) {
     redirect("/login");
   }

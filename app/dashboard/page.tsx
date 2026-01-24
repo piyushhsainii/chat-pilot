@@ -1,267 +1,220 @@
 "use client";
-import { AnswerStyle, BotTone } from "@/lib/types";
-import { supabase } from "@/services/supabase";
-import React, { useEffect, useState } from "react";
+import { Playground } from "@/components/Playground";
+import { AnswerStyle, Bot, BotTone } from "@/lib/types";
+import { useDashboardStore } from "@/store/dashboardStore";
+import { useEffect, useState } from "react";
 
-const page = () => {
-  const [workspaceName, setWorkspaceName] = useState("Acme Global Tech");
-  const DEFAULT_BOT = {
-    id: "bot-persistent-test",
-    workspaceId: "Demo Workspace",
-    name: "Global Support Bot",
-    systemPrompt: "You are an AI assistant for the global support team.",
-    tone: BotTone.PROFESSIONAL,
-    status: "active",
-    answerStyle: AnswerStyle.DETAILED,
-    fallbackBehavior: "I cannot find that in the documents.",
-    embedSettings: { theme: "light", primaryColor: "#6366f1" },
-  };
-  const [bots, setbots] = useState([DEFAULT_BOT]);
-  const [credits, setCredits] = useState<any>({
+// Main Dashboard Page
+const DashboardPage = () => {
+  const DEMO_BOTS: Bot[] = [
+    {
+      id: "bot-1",
+      workspaceId: "Demo Workspace",
+      name: "Customer Support Bot",
+      systemPrompt:
+        "You are a helpful customer support assistant. Be empathetic and solve problems efficiently.",
+      tone: BotTone.FRIENDLY,
+      status: "active",
+      answerStyle: AnswerStyle.DETAILED,
+      fallbackBehavior:
+        "I apologize, but I don't have that information. Let me connect you with a human agent.",
+      embedSettings: { theme: "light", primaryColor: "#6366f1" },
+      model: "gpt-4o-mini",
+      contextChunks: [
+        "Our support hours are Monday-Friday 9AM-5PM EST. We offer 24/7 email support with responses within 4 hours.",
+        "For account issues, please provide your email and order number. Password resets are available through the login page.",
+        "Refund policy: Full refunds within 30 days of purchase. Partial refunds available up to 90 days.",
+      ],
+    },
+    {
+      id: "bot-2",
+      workspaceId: "Demo Workspace",
+      name: "Sales Assistant",
+      systemPrompt:
+        "You are a sales assistant focused on helping customers find the right products.",
+      tone: BotTone.PROFESSIONAL,
+      status: "active",
+      answerStyle: AnswerStyle.DETAILED,
+      fallbackBehavior:
+        "I'm not sure about that. Would you like to speak with our sales team?",
+      embedSettings: { theme: "light", primaryColor: "#ec4899" },
+      model: "gpt-4o-mini",
+      contextChunks: [
+        "We offer three pricing tiers: Starter ($29/mo), Professional ($79/mo), and Enterprise (custom pricing).",
+        "All plans include unlimited users, 24/7 support, and a 14-day free trial. Enterprise includes dedicated support and custom integrations.",
+        "Current promotion: 20% off annual plans. Use code ANNUAL20 at checkout.",
+      ],
+    },
+    {
+      id: "bot-3",
+      workspaceId: "Demo Workspace",
+      name: "Tech Support Pro",
+      systemPrompt:
+        "You are a technical support specialist. Provide clear, step-by-step solutions.",
+      tone: BotTone.PROFESSIONAL,
+      status: "active",
+      answerStyle: AnswerStyle.DETAILED,
+      fallbackBehavior:
+        "This requires specialized knowledge. I'll escalate to our technical team.",
+      embedSettings: { theme: "dark", primaryColor: "#10b981" },
+      model: "gpt-4o-mini",
+      contextChunks: [
+        "API Setup: 1) Generate API key in dashboard 2) Add to environment variables 3) Initialize client with key.",
+        "Common error 401: Invalid API key. Check for typos and ensure key is active in dashboard.",
+        "Rate limits: 100 requests/minute on Starter, 1000/min on Professional, unlimited on Enterprise.",
+      ],
+    },
+    {
+      id: "bot-4",
+      workspaceId: "Demo Workspace",
+      name: "Casual Chat Bot",
+      systemPrompt:
+        "You are a friendly conversational AI. Keep things light and engaging.",
+      tone: BotTone.FRIENDLY,
+      status: "active",
+      answerStyle: AnswerStyle.SHORT,
+      fallbackBehavior:
+        "Hmm, I'm not sure about that one! Want to ask me something else?",
+      embedSettings: { theme: "light", primaryColor: "#f59e0b" },
+      model: "gpt-4o-mini",
+      contextChunks: [
+        "Hey there! I'm here to chat and help out with whatever you need. No question is too small!",
+        "Fun fact: Our team loves coffee and has consumed over 10,000 cups while building this product.",
+        "We're based in San Francisco but work with customers all around the world!",
+      ],
+    },
+  ];
+  const { bots, user, workspace } = useDashboardStore()
+  // const [bots] = useState(DEMO_BOTS);
+
+  const [selectedBotId, setSelectedBotId] = useState(bots && bots.length > 0 ? bots[0].id : null);
+  const [credits, setCredits] = useState({
     totalCredits: 500,
     usedCredits: 142,
     planName: "Starter",
     costPerQuery: 1,
   });
 
-  const Playground = ({
-    bots,
-    credits,
-    setCredits,
-  }: {
-    bots: any[];
-    credits: any;
-    setCredits: any;
-  }) => {
-    const [selectedBotId, setSelectedBotId] = useState(bots[0]?.id || "");
-    const [messages, setMessages] = useState<{
-      [botId: string]: { role: "user" | "bot"; text: string }[];
-    }>({});
-    const [input, setInput] = useState("");
-
-    const activeBot = bots.find((b) => b.id === selectedBotId);
-    const currentMessages = messages[selectedBotId] || [];
-
-    const handleSend = () => {
-      if (!input.trim() || !activeBot) return;
-      if (credits.usedCredits >= credits.totalCredits) {
-        alert("Credit limit reached! Please upgrade your plan.");
-        return;
-      }
-
-      const userMsg = input;
-      setMessages((prev) => ({
-        ...prev,
-        [selectedBotId]: [
-          ...(prev[selectedBotId] || []),
-          { role: "user", text: userMsg },
-        ],
-      }));
-      setInput("");
-
-      // Deduct Credit
-      setCredits((prev: any) => ({
-        ...prev,
-        usedCredits: prev.usedCredits + 1,
-      }));
-
-      setTimeout(() => {
-        setMessages((prev) => ({
-          ...prev,
-          [selectedBotId]: [
-            ...(prev[selectedBotId] || []),
-            {
-              role: "bot",
-              text: `Response from ${activeBot.name}: Context analyzed. This query cost 1 credit.`,
-            },
-          ],
-        }));
-      }, 1000);
-    };
-
-    const theme = activeBot?.embedSettings?.theme || "light";
-    const primaryColor = activeBot?.embedSettings?.primaryColor || "#6366f1";
-
-    return (
-      <div className="flex flex-col lg:flex-row gap-8 w-full h-full overflow-hidden">
-        <div className="lg:w-64 flex-shrink-0 space-y-4 h-full overflow-y-auto pr-2">
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter px-1">
-            Select Agent
-          </h3>
-          <div className="space-y-2 pb-10">
-            {bots.map((bot) => (
-              <button
-                key={bot.id}
-                onClick={() => setSelectedBotId(bot.id)}
-                className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all text-left group ${
-                  selectedBotId === bot.id
-                    ? "bg-white border-indigo-600 shadow-md"
-                    : "bg-white/40 border-slate-100"
-                }`}
-              >
-                <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-sm flex-shrink-0">
-                  🤖
-                </div>
-                <p
-                  className={`text-xs font-bold truncate tracking-tighter ${selectedBotId === bot.id ? "text-indigo-600" : "text-slate-700"}`}
-                >
-                  {bot.name}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 min-w-0 flex justify-end items-start h-full pr-1">
-          <div
-            className={`w-full max-w-[420px] h-[580px] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
-          >
-            <div
-              className="p-5 flex justify-between items-center border-b"
-              style={{ borderTop: `6px solid ${primaryColor}` }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-xl shadow-sm">
-                  🤖
-                </div>
-                <div>
-                  <h5 className="font-bold text-xs tracking-tighter">
-                    {activeBot?.name}
-                  </h5>
-                  <span className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">
-                    Live Preview
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 p-6 space-y-5 flex flex-col overflow-y-auto scrollbar-hide">
-              {currentMessages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-                >
-                  <div
-                    className={`p-3.5 rounded-2xl text-[13px] leading-relaxed max-w-[85%] shadow-sm tracking-tighter ${m.role === "bot" ? "bg-slate-50 border border-slate-100 rounded-tl-none" : "rounded-tr-none"}`}
-                    style={
-                      m.role === "user"
-                        ? { backgroundColor: primaryColor, color: "#fff" }
-                        : {}
-                    }
-                  >
-                    {m.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-5 border-t">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-2xl border bg-white border-slate-200">
-                <input
-                  placeholder="Type your message..."
-                  className="bg-transparent text-xs w-full outline-none font-medium h-10 tracking-tighter"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                />
-                <button
-                  onClick={handleSend}
-                  className="w-10 h-10 rounded-xl text-white shadow-lg flex items-center justify-center"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  ➔
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
+  const selectedBot = bots && bots.find((b) => b.id === selectedBotId)
   useEffect(() => {
-    const yo = async () => {
-      const { data } = await supabase.auth.getSession();
-      console.log(data);
-    };
-    yo();
-  }, []);
+    if (!bots || bots.length == 0) return;
+
+    setSelectedBotId(bots[0].id)
+  }, [bots])
 
   return (
-    <div>
-      <header className="flex justify-between items-center mb-8 pb-4 border-b border-slate-200">
-        <div className="flex items-center gap-4">
-          <div className="bg-white h-10 w-10 rounded-xl flex items-center justify-center border border-slate-200 shadow-sm text-lg text-indigo-600 font-bold">
-            🏢
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="max-w-[1600px] mx-auto">
+        <header className="flex justify-between items-center mb-8 pb-4 border-b border-slate-200">
+          <div className="flex items-center gap-4">
+            <div className="bg-white h-12 w-12 rounded-xl flex items-center justify-center border border-slate-200 shadow-sm text-2xl">
+              🏢
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                Workspace
+              </p>
+              <h1 className="text-sm font-bold text-slate-800 tracking-tight">
+                Demo Workspace
+              </h1>
+            </div>
           </div>
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter tracking-widest">
-              Workspace
-            </p>
-            <h1 className="text-xs font-bold text-slate-800 uppercase tracking-tighter">
-              {workspaceName}
-            </h1>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Credits Left
+              </p>
+              <p className="text-sm font-bold text-indigo-600 tracking-tight">
+                {credits.totalCredits - credits.usedCredits}{" "}
+                <span className="text-slate-400">/ {credits.totalCredits}</span>
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-6">
-          <div className="text-right hidden sm:block">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-              Credits Left
-            </p>
-            <p className="text-xs font-black text-indigo-600 tracking-tighter">
-              {credits.totalCredits - credits.usedCredits}{" "}
-              <span className="text-slate-400">/ {credits.totalCredits}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => (window.location.hash = "#home")}
-            className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 tracking-tighter uppercase"
-          >
-            Log out
-          </button>
-        </div>
-      </header>
+        </header>
 
-      <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-180px)] flex flex-col">
-        <h2 className="text-2xl font-black tracking-tighter">Overview</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
-          <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg flex flex-col justify-between">
-            <h4 className="text-[9px] uppercase opacity-70 font-bold tracking-tighter">
-              Active Agents
-            </h4>
-            <div className="text-2xl font-black mt-1 tracking-tighter">
-              {/* {bots.length} */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-black tracking-tighter text-slate-900">
+              Bot Playground
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 tracking-tight">
+                {bots && bots.filter((b) => b.bot_settings?.active).length} Active Bots
+              </span>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-sm">
-            <h4 className="text-[9px] uppercase text-slate-400 font-bold tracking-tighter">
-              Messages
-            </h4>
-            <div className="text-2xl font-black mt-1 text-slate-900 tracking-tighter">
-              {credits.usedCredits}
+
+          {/* Bot Selection Grid */}
+          {bots && bots.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {bots.map((bot) => (
+                <button
+                  key={bot.id}
+                  onClick={() => setSelectedBotId(bot.id)}
+                  className={`relative p-4 rounded-2xl border-2 transition-all text-left group hover:shadow-lg ${selectedBotId === bot.id
+                    ? "bg-white border-indigo-500 shadow-md scale-[1.02]"
+                    : "bg-white border-slate-200 hover:border-slate-300"
+                    }`}
+                >
+                  {selectedBotId === bot.id && (
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg">
+                      <span className="text-white text-xs">✓</span>
+                    </div>
+                  )}
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm flex-shrink-0"
+                      style={{
+                        backgroundColor:
+                          selectedBotId === bot.id
+                            ? bot.widgets?.primary_color ?? "#ffffff"
+                            : "#f1f5f9",
+                      }}
+                    >
+                      🤖
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`text-sm font-bold truncate tracking-tight mb-1 ${selectedBotId === bot.id ? "text-indigo-600" : "text-slate-800"}`}
+                      >
+                        {bot.name}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider">
+                          {bot.tone}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-sm">
-            <h4 className="text-[9px] uppercase text-slate-400 font-bold tracking-tighter">
-              Credits Used
-            </h4>
-            <div className="text-2xl font-black mt-1 text-slate-900 tracking-tighter">
-              {Math.round((credits.usedCredits / credits.totalCredits) * 100)}%
+          ) : (
+            <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center">
+              <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center text-4xl">
+                🤖
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">No Agents Available</h3>
+              <p className="text-slate-500 text-sm max-w-md mx-auto">
+                You haven't created any agents yet. Create your first agent to start using the playground.
+              </p>
             </div>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-sm">
-            <h4 className="text-[9px] uppercase text-slate-400 font-bold tracking-tighter">
-              Plan
-            </h4>
-            <div className="text-2xl font-black mt-1 text-emerald-600 tracking-tighter">
-              {credits.planName}
+          )}
+
+          {/* Playground */}
+          {bots && bots.length > 0 && selectedBot && (
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl border border-slate-200 p-6 shadow-lg">
+              <Playground
+                selectedBot={selectedBot}
+                credits={credits}
+                setCredits={setCredits}
+              />
             </div>
-          </div>
-        </div>
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <Playground bots={bots} credits={credits} setCredits={setCredits} />
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default page;
+export default DashboardPage;

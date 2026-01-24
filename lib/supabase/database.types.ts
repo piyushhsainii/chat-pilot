@@ -16,33 +16,36 @@ export type Database = {
     Tables: {
       bot_settings: {
         Row: {
+          active: boolean | null
           allowed_domains: string[] | null
           bot_id: string | null
           created_at: string | null
           id: string
+          is_configured: boolean | null
           rate_limit: number | null
           rate_limit_hit_message: string | null
-          system_instruction: string | null
           system_prompt: string | null
         }
         Insert: {
+          active?: boolean | null
           allowed_domains?: string[] | null
           bot_id?: string | null
           created_at?: string | null
           id?: string
+          is_configured?: boolean | null
           rate_limit?: number | null
           rate_limit_hit_message?: string | null
-          system_instruction?: string | null
           system_prompt?: string | null
         }
         Update: {
+          active?: boolean | null
           allowed_domains?: string[] | null
           bot_id?: string | null
           created_at?: string | null
           id?: string
+          is_configured?: boolean | null
           rate_limit?: number | null
           rate_limit_hit_message?: string | null
-          system_instruction?: string | null
           system_prompt?: string | null
         }
         Relationships: [
@@ -61,6 +64,7 @@ export type Database = {
           fallback_behavior: string | null
           id: string
           name: string
+          owner_id: string | null
           system_prompt: string | null
           tone: string | null
           workspace_id: string | null
@@ -70,6 +74,7 @@ export type Database = {
           fallback_behavior?: string | null
           id?: string
           name: string
+          owner_id?: string | null
           system_prompt?: string | null
           tone?: string | null
           workspace_id?: string | null
@@ -79,6 +84,7 @@ export type Database = {
           fallback_behavior?: string | null
           id?: string
           name?: string
+          owner_id?: string | null
           system_prompt?: string | null
           tone?: string | null
           workspace_id?: string | null
@@ -99,6 +105,7 @@ export type Database = {
           bot_id: string | null
           confidence_score: number | null
           created_at: string | null
+          environment: string | null
           id: string
           metadata: Json | null
           question: string
@@ -109,6 +116,7 @@ export type Database = {
           bot_id?: string | null
           confidence_score?: number | null
           created_at?: string | null
+          environment?: string | null
           id?: string
           metadata?: Json | null
           question: string
@@ -119,6 +127,7 @@ export type Database = {
           bot_id?: string | null
           confidence_score?: number | null
           created_at?: string | null
+          environment?: string | null
           id?: string
           metadata?: Json | null
           question?: string
@@ -127,6 +136,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "chat_logs_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_transactions: {
+        Row: {
+          amount: number
+          bot_id: string | null
+          created_at: string | null
+          id: string
+          reason: string | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          bot_id?: string | null
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          bot_id?: string | null
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_transactions_bot_id_fkey"
             columns: ["bot_id"]
             isOneToOne: false
             referencedRelation: "bots"
@@ -183,6 +230,7 @@ export type Database = {
         Row: {
           bot_id: string | null
           created_at: string | null
+          doc_url: string | null
           id: string
           last_indexed: string | null
           name: string
@@ -192,6 +240,7 @@ export type Database = {
         Insert: {
           bot_id?: string | null
           created_at?: string | null
+          doc_url?: string | null
           id?: string
           last_indexed?: string | null
           name: string
@@ -201,6 +250,7 @@ export type Database = {
         Update: {
           bot_id?: string | null
           created_at?: string | null
+          doc_url?: string | null
           id?: string
           last_indexed?: string | null
           name?: string
@@ -238,6 +288,30 @@ export type Database = {
           id?: string
           ip?: string
           window_start?: string | null
+        }
+        Relationships: []
+      }
+      user_credits: {
+        Row: {
+          alert_20_sent: boolean | null
+          alert_5_sent: boolean | null
+          balance: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_20_sent?: boolean | null
+          alert_5_sent?: boolean | null
+          balance?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_20_sent?: boolean | null
+          alert_5_sent?: boolean | null
+          balance?: number
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -353,19 +427,25 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          industry: string | null
           name: string
+          owner_id: string | null
           tier: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
+          industry?: string | null
           name: string
+          owner_id?: string | null
           tier?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
+          industry?: string | null
           name?: string
+          owner_id?: string | null
           tier?: string | null
         }
         Relationships: []
@@ -375,6 +455,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_credit_alert: {
+        Args: { p_user_id: string }
+        Returns: {
+          alert_20: boolean
+          alert_5: boolean
+          balance: number
+        }[]
+      }
+      deduct_credit: { Args: { p_user_id: string }; Returns: boolean }
       match_documents: {
         Args: {
           match_count: number

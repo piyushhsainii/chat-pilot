@@ -7,7 +7,7 @@ export async function getWorkspaceData(userId: string) {
     supabase
       .from("workspace_users")
       .select("*,workspaces(*)")
-      .eq("owner_id", userId)
+      .eq("auth_user_id", userId)
       .single(),
 
     supabase

@@ -1,19 +1,20 @@
-import { Tables } from "@/lib/supabase/database.types";
+import { BotWithRelations, WorkspaceUserWithWorkspace } from "@/lib/types";
 import { User } from "@supabase/supabase-js";
 import { create } from "zustand";
 
 interface DashboardState {
   user: User | null;
-  workspace: Tables<"workspace_users"> | null;
-  bots: Tables<"bots">[] | null;
+  workspace: WorkspaceUserWithWorkspace | null;
+  bots: BotWithRelations[] | null;
 
   setDashboard: (data: Partial<DashboardData>) => void;
   clearDashboard: () => void;
 }
+
 interface DashboardData {
   user: User;
-  workspace: Tables<"workspace_users"> | null;
-  bots: Tables<"bots">[] | null;
+  workspace: WorkspaceUserWithWorkspace | null;
+  bots: BotWithRelations[] | null;
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({

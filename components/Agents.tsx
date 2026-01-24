@@ -2,6 +2,8 @@
 import { useState } from "react";
 import BotCard from "./BotCard";
 import { AnswerStyle, BotTone } from "@/lib/types";
+import NewAgentStepper from "./NewAgentStepper";
+import { motion } from "framer-motion";
 
 const DEFAULT_BOT = {
   id: "bot-persistent-test",
@@ -18,24 +20,67 @@ const DEFAULT_BOT = {
 const Agents = () => {
   const [bots, setbots] = useState([DEFAULT_BOT]);
   const [selectedBot, setSelectedBot] = useState(DEFAULT_BOT);
+  const [showNewAgent, setShowNewAgent] = useState(false);
 
   return (
-    <div className="animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-black tracking-tighter">My Agents</h2>
-        <button
-          // onClick={}
-          className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-lg tracking-tighter"
-        >
-          + New Agent
-        </button>
+    <>
+      <div className="animate-in fade-in duration-500">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-black tracking-tighter">My Agents</h2>
+          <motion.button
+            onClick={() => setShowNewAgent(true)}
+            whileHover="hover"
+            whileTap={{ scale: 0.96 }}
+            initial="rest"
+            animate="rest"
+            variants={{
+              rest: { scale: 1 },
+              hover: { scale: 1.05 },
+            }}
+            className="relative overflow-hidden group bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs tracking-tight shadow-lg"
+          >
+            {/* Glow */}
+            <span className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-300" />
+
+            {/* Sparkle */}
+            <motion.span
+              variants={{
+                rest: { opacity: 0, y: 10 },
+                hover: { opacity: 1, y: -10 },
+              }}
+              transition={{ duration: 0.4 }}
+              className="absolute right-3 top-1 text-lg"
+            >
+              ✨
+            </motion.span>
+
+            {/* Content */}
+            <span className="relative z-10 flex items-center gap-2">
+              <motion.span
+                variants={{
+                  rest: { rotate: 0, x: 0 },
+                  hover: { rotate: 20, x: 4 },
+                }}
+                transition={{ type: "spring", stiffness: 300 }}
+                className="text-base"
+              >
+                🤖
+              </motion.span>
+
+              <span>New Agent</span>
+            </span>
+          </motion.button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {bots.map((bot) => (
+            <BotCard key={bot.id} bot={bot} onSelect={setSelectedBot} />
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {bots.map((bot) => (
-          <BotCard key={bot.id} bot={bot} onSelect={setSelectedBot} />
-        ))}
-      </div>
-    </div>
+      {showNewAgent && (
+        <NewAgentStepper onClose={() => setShowNewAgent(false)} />
+      )}
+    </>
   );
 };
 

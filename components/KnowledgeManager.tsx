@@ -12,8 +12,8 @@ type Source = {
 };
 
 const KnowledgeManager: React.FC<{
-  userId: string;
-  botId: string;
+  userId?: string;
+  botId?: string;
   plan?: "free" | "pro";
 }> = ({ userId = "test-user", botId = "123", plan = "free" }) => {
   const [activeTab, setActiveTab] = useState<"upload" | "urls" | "text">(
