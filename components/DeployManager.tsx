@@ -9,7 +9,7 @@ type ConfigCheck = {
 };
 
 const DeployManager: React.FC = () => {
-  const { bots, workspace } = useDashboardStore();
+  const { bots, workspaces } = useDashboardStore();
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const selectedBot = bots?.find((se) => se.id == selectedBotId)
   const [theme, setTheme] = useState<"light" | "dark">((selectedBot?.widgets?.theme as "light" | "dark") ?? "light");
