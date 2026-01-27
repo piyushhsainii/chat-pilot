@@ -1,15 +1,15 @@
 
+import { BotWithRelations } from '@/lib/types';
 import React, { useState } from 'react';
-import { Bot, BotTone, AnswerStyle } from '../types';
 
 interface BotEditorProps {
-  bot: Bot;
-  onSave: (bot: Bot) => void;
+  bot: BotWithRelations;
+  onSave: (bot: BotWithRelations) => void;
   onClose: () => void;
 }
 
 const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
-  const [editedBot, setEditedBot] = useState<Bot>(bot);
+  const [editedBot, setEditedBot] = useState<BotWithRelations>(bot);
   const [activeSubTab, setActiveSubTab] = useState<'config' | 'security' | 'history'>('config');
 
   const templates = [
@@ -69,7 +69,7 @@ const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
             { id: 'security', label: 'Security' },
             { id: 'history', label: 'Version History' }
           ].map(tab => (
-            <button 
+            <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
               className={`text-sm font-bold pb-2 transition-all border-b-2 ${activeSubTab === tab.id ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
@@ -89,17 +89,17 @@ const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
                   <h3 className="font-bold text-slate-800">System Instruction</h3>
                   <span className="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold text-slate-500 uppercase">Custom Prompt</span>
                 </div>
-                <textarea 
+                <textarea
                   rows={12}
-                  value={editedBot.systemPrompt}
-                  onChange={(e) => setEditedBot({...editedBot, systemPrompt: e.target.value})}
+                  value={editedBot.system_prompt ?? ""}
+                  onChange={(e) => setEditedBot({ ...editedBot, system_prompt: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none text-sm font-mono leading-relaxed"
                   placeholder="Paste or write your system instructions..."
                 />
               </section>
 
               <div className="flex justify-end pt-2">
-                <button 
+                <button
                   onClick={() => onSave(editedBot)}
                   className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
                 >
@@ -116,9 +116,9 @@ const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
                 <p className="text-xs text-slate-400 mb-4">Select a persona template to overwrite your current prompt.</p>
                 <div className="space-y-3">
                   {templates.map((t, i) => (
-                    <button 
+                    <button
                       key={i}
-                      onClick={() => setEditedBot({...editedBot, systemPrompt: t.prompt})}
+                      onClick={() => setEditedBot({ ...editedBot, system_prompt: t.prompt })}
                       className="w-full text-left p-4 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group"
                     >
                       <h4 className="text-sm font-bold text-slate-800 group-hover:text-indigo-600">{t.name}</h4>
@@ -146,8 +146,8 @@ const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
                   <label className="block text-sm font-bold text-slate-800 mb-2">Allowed Domains</label>
                   <p className="text-xs text-slate-400 mb-4 italic">Specify the domains where the iframe can be embedded. Leave blank for no restrictions.</p>
                   <div className="flex gap-3">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="example.com"
                       className="flex-1 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 font-mono text-sm"
                     />
@@ -172,7 +172,7 @@ const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-slate-800">Rate Limit hit message</label>
                     <p className="text-xs text-slate-400">Displayed once rate limit is reached.</p>
-                    <input 
+                    <input
                       defaultValue="Too many messages. Please try again in a few minutes."
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm"
                     />
@@ -198,11 +198,11 @@ const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
 
         {activeSubTab === 'history' && (
           <div className="max-w-4xl space-y-4 pb-4">
-             <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center space-y-4">
-               <div className="text-4xl">🕒</div>
-               <h3 className="font-bold text-slate-900">Version History</h3>
-               <p className="text-sm text-slate-500">Previous versions of your system prompt will appear here as you save changes.</p>
-             </div>
+            <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center space-y-4">
+              <div className="text-4xl">🕒</div>
+              <h3 className="font-bold text-slate-900">Version History</h3>
+              <p className="text-sm text-slate-500">Previous versions of your system prompt will appear here as you save changes.</p>
+            </div>
           </div>
         )}
       </div>

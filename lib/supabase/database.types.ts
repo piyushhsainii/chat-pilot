@@ -140,6 +140,38 @@ export type Database = {
           },
         ]
       }
+      chat_sessions: {
+        Row: {
+          bot_id: string
+          created_at: string | null
+          id: string
+          is_anonymous: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_transactions: {
         Row: {
           amount: number

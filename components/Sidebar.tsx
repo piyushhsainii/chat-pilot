@@ -1,6 +1,16 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import PlugConnectedIcon from "./icons/plug-connectec-icon";
+import { BotIcon } from "./icons/agent-icon";
+import LayoutDashboardIcon from "./icons/layout-dashboard";
+import BookIcon from "./icons/books";
+import ChartLineIcon from "./icons/analytics-icon";
+import RocketIcon from "./icons/launch";
+import GearIcon from "./icons/settings-icon";
+import BulbSvg from "./icons/bulb";
+import { LayoutDashboard } from "lucide-react";
 
 const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -9,32 +19,33 @@ const Sidebar: React.FC = () => {
   const router = useRouter();
 
   const navItems = [
-    { id: "overview", label: "Home", path: "/dashboard", icon: "🏠" },
-    { id: "bots", label: "My Agents", path: "/dashboard/agents", icon: "🤖" },
+    { id: "overview", label: "Home", path: "/dashboard", icon: <LayoutDashboard /> },
+    { id: "bots", label: "My Agents", path: "/dashboard/agents", icon: <BotIcon /> },
     {
       id: "knowledge",
       label: "Knowledge Base",
       path: "/dashboard/knowledge",
-      icon: "📚",
+      icon: <BookIcon />,
     },
     {
       id: "analytics",
       label: "Analytics",
       path: "/dashboard/analytics",
-      icon: "📈",
+      icon: <ChartLineIcon />,
     },
-    { id: "deploy", label: "Deploy", path: "/dashboard/deploy", icon: "🚀" },
+    { id: "deploy", label: "Deploy", path: "/dashboard/deploy", icon: <RocketIcon /> },
+    { id: "connectors", label: "Connectors", path: "/dashboard/connectors", icon: <PlugConnectedIcon /> },
     {
-      id: "docs",
-      label: "Developer Docs",
-      path: "/dashboard/docs",
-      icon: "📄",
+      id: "guide",
+      label: "User Guide",
+      path: "/dashboard/guide",
+      icon: <BulbSvg />,
     },
     {
       id: "settings",
       label: "Settings",
       path: "/dashboard/settings",
-      icon: "⚙️",
+      icon: <GearIcon />,
     },
   ];
 
@@ -71,6 +82,7 @@ const Sidebar: React.FC = () => {
   if (!mounted) {
     return (
       <div className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col sticky top-0 z-40">
+
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img
@@ -80,6 +92,7 @@ const Sidebar: React.FC = () => {
             />
           </div>
         </div>
+
       </div>
     );
   }
@@ -90,13 +103,15 @@ const Sidebar: React.FC = () => {
     >
       <div className="p-5 border-b border-slate-100 flex items-center justify-between">
         {!isCollapsed && (
-          <div className="flex items-center gap-2">
-            <img
-              src="/logo2.png"
-              alt=""
-              className="max-h-12 w-full select-none"
-            />
-          </div>
+          <Link href={'/'} >
+            <div className="flex items-center gap-2">
+              <img
+                src="/logo2.png"
+                alt=""
+                className="max-h-12 w-full select-none"
+              />
+            </div>
+          </Link>
         )}
         <button
           onClick={toggleSidebar}
@@ -112,13 +127,12 @@ const Sidebar: React.FC = () => {
           <button
             key={item.id}
             onClick={() => handleNavigation(item)}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all group ${
-              activeTab === item.id
-                ? "bg-indigo-50 text-indigo-700 font-bold shadow-sm"
-                : "text-slate-500 hover:bg-slate-50"
-            }`}
+            className={`w-full  flex items-center gap-3 px-3 py-3 rounded-xl transition-all group ${activeTab === item.id
+              ? "bg-indigo-50 text-indigo-700 font-bold shadow-sm"
+              : "text-slate-500 hover:bg-slate-50"
+              }`}
           >
-            <span className="text-xl shrink-0">{item.icon}</span>
+            <span className="text-xl shrink-0 ">{item.icon}</span>
             {!isCollapsed && (
               <span className="text-sm tracking-tighter truncate opacity-100 transition-opacity duration-300">
                 {item.label}

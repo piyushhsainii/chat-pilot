@@ -4,15 +4,17 @@ import { generateChatHTML } from "@/lib/widget/generateChatHTML";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { botId: string } },
+  context: { params: Promise<{ botId: string }> },
 ) {
-  const bot = await validateBot(params.botId, req.headers.get("referer"));
+  const { botId } = await context.params;
+
+  const bot = await validateBot(botId, req.headers.get("referer"));
   if (!bot) {
     return new NextResponse("Unauthorized", { status: 403 });
   }
 
   const html = generateChatHTML({
-    botId: params.botId,
+    botId,
     name: bot.widgets?.title || bot.name,
     theme: "light",
     primary: bot.widgets?.primary_color || "6366f1",

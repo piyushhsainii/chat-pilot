@@ -15,8 +15,10 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Unauthorized", { status: 403 });
   }
 
-  const allowedDomains = bot.settings?.allowed_domains?.length
-    ? bot.settings.allowed_domains.map((d: string) => `https://${d}`).join(" ")
+  const allowedDomains = bot.bot_settings?.allowed_domains?.length
+    ? bot.bot_settings.allowed_domains
+        .map((d: string) => `https://${d}`)
+        .join(" ")
     : "*";
 
   const csp = `
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
   const html = generateChatHTML({
     botId,
     name: bot.widgets?.title || bot.name,
-    theme: bot.widgets?.theme || "light",
+    theme: (bot.widgets?.theme as "light" | "dark") || "light",
     primary: bot.widgets?.primary_color || "6366f1",
     textColor: "ffffff",
     embedded: true,

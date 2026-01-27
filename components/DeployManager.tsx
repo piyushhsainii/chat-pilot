@@ -69,7 +69,7 @@ const DeployManager: React.FC = () => {
       selectedBot.widgets?.greeting_message ?? ""
     );
 
-    const domains = selectedBot.bot_settings?.allowed_domains;
+    const domains = selectedBot.bot_settings?.allowed_domains || [];
 
     if (!domains) {
       setAllowedDomains(["example.com"]);
@@ -77,6 +77,7 @@ const DeployManager: React.FC = () => {
       setAllowedDomains(domains);
     } else {
       setAllowedDomains(
+        // @ts-ignore
         domains.split(",").map(d => d.trim()).filter(Boolean)
       );
     }
@@ -414,7 +415,7 @@ const DeployManager: React.FC = () => {
                         Greeting Message
                       </label>
                       <textarea
-                        value={welcomeMessage}
+                        value={welcomeMessage || ""}
                         onChange={(e) => setWelcomeMessage(e.target.value)}
                         className="w-full px-5 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 h-32 resize-none font-medium leading-relaxed tracking-tighter"
                         placeholder="Welcome your users..."

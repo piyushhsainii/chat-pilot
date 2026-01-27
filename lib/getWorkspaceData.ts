@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function getWorkspaceData(userId: string) {
   const supabase = await createClient();
 
-  const [{ data: workspace }, { data: bots }] = await Promise.all([
+  const [{ data: workspaces }, { data: bots }] = await Promise.all([
     supabase
       .from("workspace_users")
       .select("*,workspaces(*)")
@@ -17,7 +17,7 @@ export async function getWorkspaceData(userId: string) {
   ]);
 
   return {
-    workspace,
+    workspaces,
     bots: bots,
   };
 }

@@ -1,4 +1,5 @@
 
+'use client'
 import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
@@ -92,24 +93,23 @@ const Analytics: React.FC = () => {
             <div key={item.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                    item.status === 'unanswered' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
-                  }`}>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${item.status === 'unanswered' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+                    }`}>
                     {item.status.replace('_', ' ')}
                   </span>
                   <span className="text-xs text-slate-400">Asked {item.count} times</span>
                 </div>
                 <p className="text-sm font-bold text-slate-800 leading-tight">"{item.q}"</p>
               </div>
-              
+
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => handleResolve(item.id)}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 whitespace-nowrap"
                 >
                   Add Answer to KB
                 </button>
-                <button 
+                <button
                   onClick={() => handleResolve(item.id)}
                   className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 whitespace-nowrap"
                 >

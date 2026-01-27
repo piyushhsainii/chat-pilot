@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import { getWorkspaceData } from "@/lib/getWorkspaceData";
 import { createClient } from "@/lib/supabase/server";
+import { WorkspaceUserWithWorkspace } from "@/lib/types";
 import DashboardHydrator from "@/provider/DashboardHydrator";
 import { redirect } from "next/navigation";
 
@@ -22,7 +23,7 @@ export default async function RootLayout({
   // 📦 Load all dashboard data
   const workspaceData = await getWorkspaceData(user.id);
 
-  if (!workspaceData.workspace) {
+  if (!workspaceData.workspaces) {
     redirect("/onboarding");
   }
   return (
@@ -31,7 +32,8 @@ export default async function RootLayout({
         data={{
           bots: workspaceData.bots,
           user,
-          workspace: workspaceData.workspace,
+          // @ts-ignore
+          workspaces: workspaceData.workspaces
         }}
       />
       <div className="flex min-h-screen bg-slate-50 font-sans antialiased text-slate-900 overflow-hidden">
