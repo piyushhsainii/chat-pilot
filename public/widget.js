@@ -10,10 +10,13 @@
       this.init();
     }
     extractConfig() {
-      const script = document.querySelector("script[data-bot-id]");
+      // Try both selectors
+      const script =
+        document.querySelector("script[data-bot-id]") ||
+        document.querySelector("script[data-chat-pilot][src*='widget.js']");
 
       if (!script) {
-        console.warn("[ChatPilot] Script tag with data-bot-id not found");
+        console.warn("[ChatPilot] Script tag not found");
         return null;
       }
 
