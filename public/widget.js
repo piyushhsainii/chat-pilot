@@ -4,23 +4,58 @@
   class ChatPilotWidget {
     constructor() {
       this.config = this.extractConfig();
-      if (!this.config?.botId) return;
+
+      console.log("[ChatPilot] Config extracted:", this.config);
+
+      if (!this.config?.botId) {
+        console.error("[ChatPilot] No valid botId found");
+        return;
+      }
 
       this.isOpen = false;
       this.init();
     }
+
     extractConfig() {
-      // Try both selectors
-      const script =
-        document.querySelector("script[data-bot-id]") ||
-        document.querySelector("script[data-chat-pilot][src*='widget.js']");
+      // Log all script tags for debugging
+      const allScripts = document.querySelectorAll("script");
+      console.log("[ChatPilot] Total scripts found:", allScripts.length);
+
+      const script = document.querySelector("script[data-bot-id]");
+      console.log("[ChatPilot] Script with data-bot-id:", script);
 
       if (!script) {
-        console.warn("[ChatPilot] Script tag not found");
+        console.warn("[ChatPilot] Script tag with data-bot-id not found");
+
+        // Fallback: try to find by src
+        const widgetScript = document.querySelector("script[src*='widget.js']");
+        console.log("[ChatPilot] Widget script by src:", widgetScript);
+
+        if (widgetScript) {
+          const botId = widgetScript.getAttribute("data-bot-id");
+          console.log("[ChatPilot] BotId from widget script:", botId);
+
+          if (botId) {
+            return {
+              botId,
+              baseUrl:
+                widgetScript.getAttribute("data-base-url") ||
+                "https://chat-pilot-agent.vercel.app",
+              theme: widgetScript.getAttribute("data-theme") || "light",
+              primary: widgetScript.getAttribute("data-primary") || "6366f1",
+              textColor: widgetScript.getAttribute("data-text") || "ffffff",
+              name: decodeURIComponent(
+                widgetScript.getAttribute("data-name") || "Chat Assistant",
+              ),
+            };
+          }
+        }
+
         return null;
       }
 
       const botId = script.getAttribute("data-bot-id");
+      console.log("[ChatPilot] Extracted botId:", botId);
 
       if (!botId) {
         console.warn("[ChatPilot] data-bot-id is missing");
@@ -143,8 +178,10 @@
 `;
     }
   }
+
   function initChatPilot() {
     if (window.ChatPilotWidget) return;
+    console.log("[ChatPilot] Initializing widget...");
     window.ChatPilotWidget = new ChatPilotWidget();
   }
 
@@ -156,6 +193,4 @@
   } else {
     document.addEventListener("DOMContentLoaded", initChatPilot);
   }
-
-  // window.ChatPilotWidget = new ChatPilotWidget();
 })();
