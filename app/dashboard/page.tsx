@@ -61,7 +61,7 @@ const isBotFullyConfigured = (bot: any) => {
 ---------------------------------------- */
 
 const DashboardPage = () => {
-  const { bots, workspace } = useDashboardStore();
+  const { bots, workspaces } = useDashboardStore();
 
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const selectedBot = bots?.find((b) => b.id === selectedBotId);
@@ -90,7 +90,7 @@ const DashboardPage = () => {
               Workspace
             </p>
             <h1 className="text-sm font-bold text-slate-800">
-              {workspace?.workspaces?.name}
+              {workspaces?.workspaces?.name}
             </h1>
           </div>
           <div className="text-sm font-bold text-indigo-600">
