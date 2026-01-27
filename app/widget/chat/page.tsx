@@ -1,9 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function WidgetChat() {
+function WidgetChatContent() {
     const searchParams = useSearchParams();
     const botId = searchParams.get("botId");
 
@@ -30,7 +31,7 @@ export default function WidgetChat() {
         }
 
         bootstrap();
-    }, [botId]); // Add botId to dependencies
+    }, [botId]);
 
     async function sendMessage(text: string) {
         if (!sessionId) return;
@@ -82,5 +83,13 @@ export default function WidgetChat() {
                 />
             </footer>
         </div>
+    );
+}
+
+export default function WidgetChat() {
+    return (
+        <Suspense fallback={<div className="p-4">Loading...</div>}>
+            <WidgetChatContent />
+        </Suspense>
     );
 }
