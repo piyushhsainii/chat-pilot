@@ -5,7 +5,7 @@ import { create } from "zustand";
 
 interface DashboardState {
   user: User | null;
-  workspace: WorkspaceUserWithWorkspace | null;
+  workspaces: WorkspaceUserWithWorkspace | null;
   bots: BotWithRelations[] | null;
 
   setDashboard: (data: Partial<DashboardState>) => void;
@@ -20,7 +20,7 @@ interface DashboardData {
 
 export const useDashboardStore = create<DashboardState>((set) => ({
   user: null,
-  workspace: null,
+  workspaces: null,
   bots: null,
 
   setDashboard: (data) =>
@@ -32,7 +32,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   clearDashboard: () =>
     set({
       user: null,
-      workspace: null,
+      workspaces: null,
       bots: null,
     }),
 }));
