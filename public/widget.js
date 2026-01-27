@@ -9,27 +9,18 @@
       this.isOpen = false;
       this.init();
     }
-
     extractConfig() {
-      const scripts = document.getElementsByTagName("script");
-
-      let script = null;
-
-      for (let i = scripts.length - 1; i >= 0; i--) {
-        if (scripts[i].src.includes("/widget.js")) {
-          script = scripts[i];
-          break;
-        }
-      }
+      const script = document.querySelector("script[data-bot-id]");
 
       if (!script) {
-        console.warn("[ChatPilot] widget.js script tag not found");
+        console.warn("[ChatPilot] Script tag with data-bot-id not found");
         return null;
       }
 
       const botId = script.getAttribute("data-bot-id");
+
       if (!botId) {
-        console.warn("[ChatPilot] data-bot-id missing on script tag");
+        console.warn("[ChatPilot] data-bot-id is missing");
         return null;
       }
 
@@ -149,6 +140,19 @@
 `;
     }
   }
+  function initChatPilot() {
+    if (window.ChatPilotWidget) return;
+    window.ChatPilotWidget = new ChatPilotWidget();
+  }
 
-  window.ChatPilotWidget = new ChatPilotWidget();
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initChatPilot();
+  } else {
+    document.addEventListener("DOMContentLoaded", initChatPilot);
+  }
+
+  // window.ChatPilotWidget = new ChatPilotWidget();
 })();
