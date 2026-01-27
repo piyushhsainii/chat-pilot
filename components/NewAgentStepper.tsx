@@ -71,12 +71,12 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
   /* ---------------- KNOWLEDGE ---------------- */
   const [textInput, setTextInput] = useState("");
   const [isSavingText, setIsSavingText] = useState(false);
-  const { user, workspace } = useDashboardStore();
+  const { user, workspaces } = useDashboardStore();
   const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
   const [domainInput, setDomainInput] = useState("");
   const MAX_DOMAINS = 3;
 
-  console.log(workspace)
+  console.log(workspaces)
 
   /* ----------------------------------------
      STEP PERSISTENCE
@@ -91,7 +91,7 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
           name,
           tone,
           owner_id: user?.id,
-          workspace_id: workspace?.workspace_id,
+          workspace_id: workspaces?.workspace_id,
         })
         .select()
         .single();
