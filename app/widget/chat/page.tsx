@@ -1,20 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-export default function WidgetChat({
-    searchParams,
-}: {
-    searchParams: { botId: string };
-}) {
+export default function WidgetChat() {
+    const searchParams = useSearchParams();
+    const botId = searchParams.get("botId");
+
     const [config, setConfig] = useState<any>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [messages, setMessages] = useState<any[]>([]);
 
     useEffect(() => {
+        if (!botId) {
+            console.error("No botId provided");
+            return;
+        }
+
         async function bootstrap() {
             const res = await fetch(
-                `/api/widget/bootstrap?botId=${searchParams.botId}`
+                `/api/widget/bootstrap?botId=${botId}`
             );
             const data = await res.json();
             setConfig(data);
@@ -25,13 +30,16 @@ export default function WidgetChat({
         }
 
         bootstrap();
-    }, []);
+    }, [botId]); // Add botId to dependencies
 
     async function sendMessage(text: string) {
         if (!sessionId) return;
 
         const res = await fetch("/api/widget/message", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({
                 session_id: sessionId,
                 message: text,
@@ -42,7 +50,13 @@ export default function WidgetChat({
         setMessages((prev) => [...prev, { role: "user", content: text }, data]);
     }
 
-    if (!config) return null;
+    if (!botId) {
+        return <div className="p-4">Error: No bot ID provided</div>;
+    }
+
+    if (!config) {
+        return <div className="p-4">Loading...</div>;
+    }
 
     return (
         <div className="h-full flex flex-col">
