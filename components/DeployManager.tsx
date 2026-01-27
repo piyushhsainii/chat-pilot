@@ -137,7 +137,7 @@ const DeployManager: React.FC = () => {
   };
 
   const embedCode = `<script
-  src="https://chatpilot.ai/v1/widget.js"
+  src="https://chat-pilot-agent.vercel.app/v1/widget.js"
   data-bot-id="${botId}"
   data-theme="${theme}"
   data-primary="${primaryColor.replace("#", "")}"
@@ -146,7 +146,7 @@ const DeployManager: React.FC = () => {
 ></script>`;
 
   const iframeCode = `<iframe
-  src="https://chatpilot.ai/widget/${botId}?theme=${theme}&primary=${primaryColor.replace("#", "")}&name=${encodeURIComponent(botName)}"
+  src="https://chat-pilot-agent.vercel.app/widget/${botId}?theme=${theme}&primary=${primaryColor.replace("#", "")}&name=${encodeURIComponent(botName)}"
   width="400"
   height="600"
   frameborder="0"

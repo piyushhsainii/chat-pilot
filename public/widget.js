@@ -18,7 +18,9 @@
 
       return {
         botId: script.getAttribute("data-bot-id"),
-        baseUrl: script.getAttribute("data-base-url") || "https://chatpilot.ai",
+        baseUrl:
+          script.getAttribute("data-base-url") ||
+          "https://chat-pilot-agent.vercel.app",
         theme: script.getAttribute("data-theme") || "light",
         primary: script.getAttribute("data-primary") || "6366f1",
         textColor: script.getAttribute("data-text") || "ffffff",

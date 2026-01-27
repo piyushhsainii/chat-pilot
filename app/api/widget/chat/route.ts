@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     style-src 'unsafe-inline';
     img-src data:;
     script-src 'unsafe-inline';
-    connect-src https://api.openai.com https://chatpilot.ai;
+    connect-src https://api.openai.com https://chat-pilot-agent.vercel.app;
     frame-ancestors ${allowedDomains};
   `.replace(/\s+/g, " ");
 
