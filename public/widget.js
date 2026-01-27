@@ -11,13 +11,30 @@
     }
 
     extractConfig() {
-      const script =
-        document.currentScript || document.querySelector("script[data-bot-id]");
+      const scripts = document.getElementsByTagName("script");
 
-      if (!script) return null;
+      let script = null;
+
+      for (let i = scripts.length - 1; i >= 0; i--) {
+        if (scripts[i].src.includes("/widget.js")) {
+          script = scripts[i];
+          break;
+        }
+      }
+
+      if (!script) {
+        console.warn("[ChatPilot] widget.js script tag not found");
+        return null;
+      }
+
+      const botId = script.getAttribute("data-bot-id");
+      if (!botId) {
+        console.warn("[ChatPilot] data-bot-id missing on script tag");
+        return null;
+      }
 
       return {
-        botId: script.getAttribute("data-bot-id"),
+        botId,
         baseUrl:
           script.getAttribute("data-base-url") ||
           "https://chat-pilot-agent.vercel.app",
