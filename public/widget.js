@@ -112,11 +112,14 @@
     open() {
       this.isOpen = true;
       this.wrapper.classList.add("open");
+      this.trigger.innerHTML =
+        '<span style="font-size: 24px; font-weight: bold;">✕</span>';
     }
 
     close() {
       this.isOpen = false;
       this.wrapper.classList.remove("open");
+      this.trigger.innerHTML = '<span style="font-size: 30px;">💬</span>';
     }
 
     getTemplate() {
@@ -127,8 +130,15 @@
 
       return `
 <style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
   .wrapper {
     position: relative;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
   iframe {
@@ -136,20 +146,20 @@
     height: 600px;
     border: none;
     border-radius: 18px;
-    box-shadow: 0 20px 50px rgba(0,0,0,.25);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
     position: absolute;
     bottom: 80px;
     right: 0;
     opacity: 0;
-    transform: scale(.9);
+    transform: scale(0.9) translateY(10px);
     pointer-events: none;
-    transition: all .25s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     background: white;
   }
 
   .wrapper.open iframe {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateY(0);
     pointer-events: all;
   }
 
@@ -162,7 +172,79 @@
     border: none;
     cursor: pointer;
     font-size: 26px;
-    box-shadow: 0 10px 25px rgba(0,0,0,.3);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .trigger:hover {
+    transform: scale(1.1);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+  }
+
+  .trigger:active {
+    transform: scale(0.95);
+  }
+
+  /* Notification badge when closed */
+  .trigger::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 12px;
+    height: 12px;
+    background: #ef4444;
+    border: 2px solid white;
+    border-radius: 50%;
+    opacity: 1;
+    transition: opacity 0.3s;
+  }
+
+  .wrapper.open .trigger::after {
+    opacity: 0;
+  }
+
+  /* Pulsing animation for notification */
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+
+  .trigger::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 12px;
+    height: 12px;
+    background: #ef4444;
+    border-radius: 50%;
+    animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    opacity: 0.75;
+  }
+
+  .wrapper.open .trigger::before {
+    display: none;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 480px) {
+    iframe {
+      width: calc(100vw - 40px);
+      height: calc(100vh - 100px);
+      right: -10px;
+      bottom: 75px;
+    }
   }
 </style>
 
@@ -171,9 +253,12 @@
     src="${this.config.baseUrl}/widget/chat?${params.toString()}"
     title="${this.config.name}"
     allow="clipboard-write"
+    loading="lazy"
   ></iframe>
 
-  <button class="trigger">💬</button>
+  <button class="trigger" aria-label="Open chat">
+    <span style="font-size: 30px;">💬</span>
+  </button>
 </div>
 `;
     }
