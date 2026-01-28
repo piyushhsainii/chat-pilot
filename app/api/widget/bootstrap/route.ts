@@ -17,8 +17,9 @@ export async function GET(req: Request) {
     .select("id, name, owner_id")
     .eq("id", botId)
     .single();
-
+  console.log(`bot`, bot);
   if (!bot) {
+    console.log(bot);
     return NextResponse.json({ error: "Bot not found" }, { status: 404 });
   }
 
