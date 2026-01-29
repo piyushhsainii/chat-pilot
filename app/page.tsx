@@ -32,14 +32,9 @@ const App: React.FC = () => {
       <Navbar scrolled={scrolled} />
       <main>
         <Hero />
-        <Highlights />
         <HowItWorks />
-        <Features />
-        <PlatformPreview />
         <Benefits />
-        <Advantages />
         <Testimonials />
-        <Security />
         <FinalCTA />
       </main>
       <Footer />

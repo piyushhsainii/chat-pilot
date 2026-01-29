@@ -11,8 +11,6 @@ const Agents = () => {
   const { bots } = useDashboardStore()
   const [showNewAgent, setShowNewAgent] = useState(false);
 
-  console.log(`check`, bots)
-
   return (
     <>
       <div className="animate-in fade-in duration-500">

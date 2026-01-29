@@ -10,7 +10,7 @@ const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
     <nav
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-zinc-950/70 backdrop-blur border-b border-white/10 py-3"
+          ? "bg-white/80 backdrop-blur border-b border-zinc-200 py-3"
           : "bg-transparent py-5"
       }`}
     >
@@ -18,28 +18,54 @@ const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
         <div className="flex items-center gap-2">
           <img
             src="/logo2.png"
-            alt=""
-            className="max-h-12 w-full select-none"
+            alt="Chat Pilot"
+            className={`max-h-10 w-auto select-none transition-opacity ${
+              scrolled ? "opacity-100" : "opacity-90"
+            }`}
           />
         </div>
 
-        <div className="hidden md:flex items-center gap-8 text-sm text-zinc-300">
-          <a href="#features" className="hover:text-white transition-colors">
+        <div
+          className={`hidden md:flex items-center gap-8 text-sm font-medium transition-colors ${
+            scrolled ? "text-zinc-600" : "text-zinc-200"
+          }`}
+        >
+          <a
+            href="#features"
+            className={`hover:opacity-100 transition-opacity ${
+              scrolled ? "opacity-80 hover:text-zinc-900" : "opacity-80 hover:text-white"
+            }`}
+          >
             Product
           </a>
-          <a href="#how" className="hover:text-white transition-colors">
+          <a
+            href="#how"
+            className={`hover:opacity-100 transition-opacity ${
+              scrolled ? "opacity-80 hover:text-zinc-900" : "opacity-80 hover:text-white"
+            }`}
+          >
             How it works
           </a>
-          <a href="#security" className="hover:text-white transition-colors">
+          <a
+            href="#security"
+            className={`hover:opacity-100 transition-opacity ${
+              scrolled ? "opacity-80 hover:text-zinc-900" : "opacity-80 hover:text-white"
+            }`}
+          >
             Security
           </a>
         </div>
 
-        <div className="flex items-center gap-4 ">
-          <Link href={"/login"}>
-            <button className="hover:cursor-pointer text-sm font-semibold px-5 py-2.5 rounded-full transition-all active:scale-95 bg-sky-400 text-zinc-950 hover:bg-sky-300 shadow-lg shadow-sky-400/10">
-              Start free
-            </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className={`text-sm font-semibold px-5 py-2.5 rounded-full transition active:scale-[0.99] ${
+              scrolled
+                ? "bg-zinc-950 text-white hover:bg-zinc-900"
+                : "bg-white text-zinc-950 hover:bg-zinc-100"
+            }`}
+          >
+            Start free
           </Link>
         </div>
       </div>

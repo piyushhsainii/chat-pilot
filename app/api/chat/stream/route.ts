@@ -1,32 +1,85 @@
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { NextRequest } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { buildKnowledgeContext } from "@/lib/knowledge/buildKnowledgeContext";
 
 export const runtime = "edge"; // Enable Edge Runtime for streaming
 
 export async function POST(req: NextRequest) {
   try {
-    const { bot, query, contextChunks } = await req.json();
+    const { botId, query, history } = await req.json();
 
-    const context = contextChunks;
+    if (!botId || !query) {
+      return new Response(JSON.stringify({ error: "Invalid payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = await createClient();
+
+    const { data: bot, error: botError } = await supabase
+      .from("bots" as any)
+      .select("id, name, tone, model, fallback_behavior, system_prompt")
+      .eq("id", botId)
+      .single();
+
+    if (botError || !bot) {
+      return new Response(JSON.stringify({ error: "Bot not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const botData = bot as any;
+
+    const { data: sources } = await supabase
+      .from("knowledge_sources" as any)
+      .select("name, type, status, doc_url")
+      .eq("bot_id", botId)
+      .neq("status", "failed")
+      .order("created_at", { ascending: false });
+
+    const { contextText } = await buildKnowledgeContext(
+      ((sources as any[]) ?? []) as any,
+    );
 
     const systemInstruction = `
-You are an AI assistant for ${bot.name}.
-Tone: ${bot.tone}
+You are an AI assistant for "${botData.name}".
+Tone: ${botData.tone || "professional"}
+
+Instructions (from bot configuration):
+${botData.system_prompt || "Be helpful and concise."}
 
 Rules:
-- Answer ONLY from the provided context.
-- If the answer is not in the context, say: "${bot.fallback_behavior}"
-- Tone should strictly be ${bot.tone}.
+- Use the knowledge context below to answer.
+- If you cannot find the answer in the knowledge, reply with: "${
+      botData.fallback_behavior || "Sorry, I could not answer that."
+    }"
 
-Context:
-${context}
+${contextText}
 `.trim();
 
+    const normalizedHistory = Array.isArray(history)
+      ? history
+          .slice(-12)
+          .map((m: any) => ({
+            role: m.role === "bot" ? "assistant" : "user",
+            content: String(m.text ?? ""),
+          }))
+          .filter((m: any) => m.content.trim().length > 0)
+      : [];
+
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...normalizedHistory,
+      { role: "user", content: String(query) },
+    ] as any;
+
     const result = await streamText({
-      model: openai(bot.model || "gpt-4o-mini"),
-      system: systemInstruction,
-      prompt: query,
+      model: openai(botData.model || "gpt-4o-mini"),
+      messages,
       temperature: 0.1,
     });
 

@@ -1,34 +1,22 @@
-import React, { useMemo, useState } from 'react';
-import { BotWithRelations } from '@/lib/types';
-import { supabase } from '@/services/supabase';
-import { TEMPLATES } from '@/lib/constants';
-
-/* -------------------------------------------------
-   Dummy Supabase helper
--------------------------------------------------- */
-const fakeSupabaseUpdate = async (table: string, payload: any) => {
-  console.log(`[SUPABASE] UPSERT → ${table}`, payload);
-  await new Promise((r) => setTimeout(r, 800));
-  return { success: true };
-};
+import React, { useMemo, useState } from "react";
+import { BotWithRelations } from "@/lib/types";
+import { supabase } from "@/services/supabase";
+import { TEMPLATES } from "@/lib/constants";
+import { Settings, Power } from "lucide-react";
 
 const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
   const [isActive, setIsActive] = useState(bot.bot_settings?.active ?? false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState("");
-  const [fallbackBehavior, setFallbackBehavior] = useState(
-    "I am not sure, please contact support.",
-  );
   /* -------------------------------------------------
      Missing configuration detection
   -------------------------------------------------- */
   const missing = useMemo(() => {
     const m: string[] = [];
-    if (!bot.system_prompt) m.push('system_prompt');
-    if (!bot.widgets) m.push('widgets');
-    if (!bot.bot_settings) m.push('bot_settings');
+    if (!bot.system_prompt) m.push("system_prompt");
+    if (!bot.bot_settings) m.push("bot_settings");
+    if (bot.bot_settings && !bot.bot_settings.is_configured) m.push("is_configured");
     return m;
   }, [bot]);
 
@@ -38,19 +26,16 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
      Local form state (schema-aligned)
   -------------------------------------------------- */
   const [form, setForm] = useState({
-    // system
-    system_prompt: bot.system_prompt ?? '',
+    // bots
+    name: bot.name ?? "",
+    tone: (bot.tone as string) ?? "Professional",
+    fallback_behavior:
+      bot.fallback_behavior ?? "I am not sure, please contact support.",
+    system_prompt: bot.system_prompt ?? "",
 
-    // widget
-    title: bot.widgets?.title ?? '',
-    theme: bot.widgets?.theme ?? 'light',
-    primary_color: bot.widgets?.primary_color ?? '#00d181',
-    button_color: bot.widgets?.button_color ?? '#ffffff',
-    greeting_message: bot.widgets?.greeting_message ?? '',
-
-    // bot settings
+    // bot_settings
     rate_limit: bot.bot_settings?.rate_limit ?? 60,
-    allowed_domains: bot.bot_settings?.allowed_domains?.join(',') ?? '',
+    allowed_domains: bot.bot_settings?.allowed_domains?.join(",") ?? "",
     rate_limit_hit_message:
       bot.bot_settings?.rate_limit_hit_message ??
       'Too many requests. Please try again later.',
@@ -63,26 +48,34 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
     setLoading(true);
     const next = !isActive;
 
-    await fakeSupabaseUpdate('bot_settings', {
-      bot_id: bot.id,
-      active: next,
-    });
-
-    setIsActive(next);
-    setLoading(false);
-    setShowConfirm(false);
+    try {
+      const { error } = await supabase
+        .from("bot_settings")
+        .upsert(
+          {
+            bot_id: bot.id,
+            active: next,
+          },
+          { onConflict: "bot_id" },
+        );
+      if (error) throw error;
+      setIsActive(next);
+      setShowConfirm(false);
+    } catch (err: any) {
+      console.error("Toggle active failed:", err);
+      alert(err?.message ?? "Failed to update bot status");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const validateConfig = () => {
     const missing: string[] = [];
 
+    if (!form.name?.trim()) missing.push("Bot name");
+    if (!form.tone?.trim()) missing.push("Tone");
     if (!form.system_prompt?.trim()) missing.push("System prompt");
-
-    if (!form.title?.trim()) missing.push("Widget title");
-    if (!form.theme) missing.push("Widget theme");
-    if (!form.primary_color) missing.push("Primary color");
-    if (!form.button_color) missing.push("Button color");
-    if (!form.greeting_message?.trim()) missing.push("Greeting message");
+    if (!form.fallback_behavior?.trim()) missing.push("Fallback behavior");
 
     if (!form.rate_limit || form.rate_limit <= 0)
       missing.push("Rate limit");
@@ -110,52 +103,21 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
     try {
       setLoading(true);
       /* -----------------------------
-         1. Update bots (system_prompt)
+         1. Update bots
       ------------------------------ */
-      if (!bot.system_prompt) {
-        const { error } = await supabase
-          .from("bots")
-          .update({
-            system_prompt: form.system_prompt,
+      const { error: botUpdateError } = await supabase
+        .from("bots" as any)
+        .update({
+          name: form.name,
+          tone: form.tone,
+          fallback_behavior: form.fallback_behavior,
+          system_prompt: form.system_prompt,
+        })
+        .eq("id", bot.id);
+      if (botUpdateError) throw botUpdateError;
 
-          })
-          .eq("id", bot.id);
-
-        if (error) throw error;
-      }
       /* -----------------------------
-         2. Upsert widgets
-      ------------------------------ */
-      if (!bot.widgets) {
-        const { error } = await supabase.from("widgets").insert({
-          bot_id: bot.id,
-          title: form.title,
-          theme: form.theme,
-          primary_color: form.primary_color,
-          button_color: form.button_color,
-          greeting_message: form.greeting_message,
-
-
-        });
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("widgets")
-          .update({
-            title: form.title,
-            theme: form.theme,
-            primary_color: form.primary_color,
-            button_color: form.button_color,
-            greeting_message: form.greeting_message,
-
-          })
-          .eq("bot_id", bot.id);
-
-        if (error) throw error;
-      }
-      /* -----------------------------
-         3. Upsert bot_settings
+         2. Upsert bot_settings
       ------------------------------ */
       const parsedDomains =
         form.allowed_domains
@@ -163,30 +125,19 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
           .map((d) => d.trim())
           .filter(Boolean) ?? [];
 
-      if (!bot.bot_settings) {
-        const { error } = await supabase.from("bot_settings").insert({
-          bot_id: bot.id,
-          rate_limit: form.rate_limit,
-          allowed_domains: parsedDomains,
-          rate_limit_hit_message: form.rate_limit_hit_message,
-          is_configured: true,
-          active: false,
-        });
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("bot_settings")
-          .update({
+      const { error: settingsUpsertError } = await supabase
+        .from("bot_settings")
+        .upsert(
+          {
+            bot_id: bot.id,
             rate_limit: form.rate_limit,
             allowed_domains: parsedDomains,
             rate_limit_hit_message: form.rate_limit_hit_message,
             is_configured: true,
-          })
-          .eq("bot_id", bot.id);
-
-        if (error) throw error;
-      }
+          },
+          { onConflict: "bot_id" },
+        );
+      if (settingsUpsertError) throw settingsUpsertError;
 
       setShowConfig(false);
     } catch (err: any) {
@@ -198,32 +149,45 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
   };
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col h-full">
+      <div className="relative bg-white border border-slate-200 rounded-xl p-5 flex flex-col h-full">
         {/* Header */}
         <div className="flex justify-between mb-4">
           <div
-            style={{ backgroundColor: bot.widgets?.primary_color ?? "" }}
-            className="h-12 w-12 rounded-lg flex items-center justify-center text-2xl bg-slate-200"
+            className="h-12 w-12 rounded-lg flex items-center justify-center text-2xl bg-slate-100 border border-slate-200"
           >
             🤖
           </div>
 
           <button
+            type="button"
             disabled={!isFullyConfigured}
             onClick={() => setShowConfirm(true)}
-            className={`px-2 py-1 text-xs font-bold rounded uppercase
+            className={`inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border transition
               ${!isFullyConfigured
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
                 : isActive
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-100 text-slate-600'
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
               }`}
+            title={
+              !isFullyConfigured
+                ? "Configure your bot to enable activation"
+                : isActive
+                  ? "Click to deactivate"
+                  : "Click to activate"
+            }
           >
-            {isActive ? 'Active' : 'Inactive'}
+            <Power className="h-4 w-4" />
+            <span>{isActive ? "Active" : "Inactive"}</span>
+            <span className="ml-1 text-[10px] font-bold opacity-70">Manage</span>
           </button>
         </div>
 
         <h3 className="text-lg font-bold text-slate-800">{bot.name}</h3>
+
+        <div className="mt-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          {bot.tone || "Professional"}
+        </div>
 
         <p className="text-sm text-slate-500 mt-1 flex-grow">
           {bot.system_prompt ?? 'No system prompt configured yet.'}
@@ -239,12 +203,23 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
             </div>
             <button
               onClick={() => setShowConfig(true)}
-              className="font-bold text-amber-700 hover:underline"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-amber-200 text-amber-800 font-semibold hover:bg-amber-100 transition"
             >
-              Configure now →
+              Configure now
+              <span className="text-amber-700">→</span>
             </button>
           </div>
         )}
+
+        {/* Quick settings */}
+        <button
+          type="button"
+          onClick={() => setShowConfig(true)}
+          className="absolute bottom-4 right-4 inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
+          title="Bot settings"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Activate / Deactivate dialog */}
@@ -284,10 +259,51 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
       {showConfig && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-lg overflow-y-auto max-h-[90vh]">
-            <h4 className="font-normal tracking-tighter text-lg mb-">Configure Bot</h4>
+            <h4 className="font-semibold text-lg mb-4">Configure Bot</h4>
+
+            {/* Bot */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-slate-700">Bot name</label>
+              <input
+                className="w-full border rounded p-2 text-sm"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700">Tone</label>
+                <select
+                  className="w-full border rounded p-2 text-sm"
+                  value={form.tone}
+                  onChange={(e) => setForm({ ...form, tone: e.target.value })}
+                >
+                  <option value="Professional">Professional</option>
+                  <option value="Friendly">Friendly</option>
+                  <option value="Casual">Casual</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">
+                  Fallback behavior
+                </label>
+                <input
+                  className="w-full border rounded p-2 text-sm"
+                  value={form.fallback_behavior}
+                  onChange={(e) =>
+                    setForm({ ...form, fallback_behavior: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
             {/* System Prompt */}
             <div className="mb-4">
-              <label className="text-sm font-normal tracking-tighter">System Prompt</label>
+              <label className="text-sm font-medium text-slate-700">
+                System prompt
+              </label>
               <textarea
                 className="w-full border rounded p-2 text-sm"
                 rows={4}
@@ -314,70 +330,9 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
               </div>
             </div>
 
-            {/* Widget */}
-            <div className="mb-4">
-              <label className="text-sm font-normal tracking-tighter">Widget Title</label>
-              <input
-                className="w-full border rounded p-2 text-sm"
-                value={form.title}
-                onChange={(e) =>
-                  setForm({ ...form, title: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
-                <label className="text-sm font-normal tracking-tighter">Theme</label>
-                <select
-                  className="w-full border rounded p-2 text-sm"
-                  value={form.theme}
-                  onChange={(e) =>
-                    setForm({ ...form, theme: e.target.value })
-                  }
-                >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </div>
-
-              <div className='flex items-center gap-2 mt-5'>
-                <label className="text-sm font-normal tracking-tighter">Primary Color</label>
-                <input
-                  type="color"
-                  value={form.primary_color}
-                  onChange={(e) =>
-                    setForm({ ...form, primary_color: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="mb-4 flex items-center gap-2">
-              <label className="text-sm font-normal tracking-tighter">Button Color</label>
-              <input
-                type="color"
-                value={form.button_color}
-                onChange={(e) =>
-                  setForm({ ...form, button_color: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="text-sm font-normal tracking-tighter">Greeting Message</label>
-              <input
-                className="w-full border rounded p-2 text-sm"
-                value={form.greeting_message}
-                onChange={(e) =>
-                  setForm({ ...form, greeting_message: e.target.value })
-                }
-              />
-            </div>
-
             {/* Bot settings */}
             <div className="mb-4">
-              <label className="text-sm font-normal tracking-tighter">Rate Limit</label>
+              <label className="text-sm font-medium text-slate-700">Rate limit</label>
               <input
                 type="number"
                 className="w-full border rounded p-2 text-sm"
@@ -389,7 +344,7 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
             </div>
 
             <div className="mb-4">
-              <label className="text-sm font-normal tracking-tighter">
+              <label className="text-sm font-medium text-slate-700">
                 Allowed Domains (comma separated)
               </label>
               <input
@@ -402,7 +357,7 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
             </div>
 
             <div className="mb-6">
-              <label className="text-sm font-normal tracking-tighter">
+              <label className="text-sm font-medium text-slate-700">
                 Rate Limit Hit Message
               </label>
               <input

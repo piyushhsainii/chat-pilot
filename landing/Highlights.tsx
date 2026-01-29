@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React from "react";
 
 const Highlights: React.FC = () => {
   const cards = [
@@ -21,21 +21,40 @@ const Highlights: React.FC = () => {
   ];
 
   return (
-    <section className="py-24 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">The complete platform for AI support agents</h2>
-          <p className="text-slate-600 text-lg">Powerful tools to solve customer problems before they reach your inbox.</p>
+    <section className="py-20 md:py-28 bg-white">
+      <div className="max-w-6xl mx-auto px-4 md:px-8">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            Built for quality
+          </p>
+          <h2 className="mt-3 text-3xl md:text-4xl font-semibold tracking-tight text-zinc-950">
+            A complete platform for customer-facing AI
+          </h2>
+          <p className="mt-4 text-base text-zinc-600 leading-relaxed">
+            Powerful controls, clean workflows, and the reliability you need to
+            ship.
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {cards.map((card, idx) => (
-            <div key={idx} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 group">
-              <div className="rounded-xl overflow-hidden mb-6 h-48 bg-slate-100">
-                <img src={card.img} alt={card.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
+          {cards.map((card) => (
+            <div
+              key={card.title}
+              className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_12px_40px_-30px_rgba(0,0,0,0.35)] hover:shadow-[0_18px_60px_-40px_rgba(0,0,0,0.45)] transition"
+            >
+              <div className="rounded-2xl overflow-hidden border border-zinc-200 bg-zinc-50">
+                <img
+                  src={card.img}
+                  alt={card.title}
+                  className="w-full h-44 object-cover saturate-0 contrast-110"
+                />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">{card.title}</h3>
-              <p className="text-slate-600 leading-relaxed">{card.desc}</p>
+              <h3 className="mt-6 text-lg font-semibold text-zinc-950">
+                {card.title}
+              </h3>
+              <p className="mt-2 text-sm text-zinc-600 leading-relaxed">
+                {card.desc}
+              </p>
             </div>
           ))}
         </div>

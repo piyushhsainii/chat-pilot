@@ -17,9 +17,7 @@ export async function GET(req: Request) {
     .select("id, name, owner_id")
     .eq("id", botId)
     .single();
-  console.log(`bot`, bot);
   if (!bot) {
-    console.log(bot);
     return NextResponse.json({ error: "Bot not found" }, { status: 404 });
   }
 
@@ -29,6 +27,12 @@ export async function GET(req: Request) {
 
     supabase.from("widgets").select("*").eq("bot_id", botId).single(),
   ]);
+
+  const { count: sourcesCount } = await supabase
+    .from("knowledge_sources" as any)
+    .select("id", { count: "exact", head: true })
+    .eq("bot_id", botId)
+    .neq("status", "failed");
 
   // 3. Create anonymous session
   const { data: session } = await supabase
@@ -60,6 +64,9 @@ export async function GET(req: Request) {
     limits: {
       rate_limit: settings?.rate_limit ?? 60,
       rate_limit_hit_message: settings?.rate_limit_hit_message,
+    },
+    knowledge: {
+      sources_count: sourcesCount ?? 0,
     },
   });
 }

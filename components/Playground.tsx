@@ -1,21 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { Bot, BotWithRelations } from "@/lib/types";
+import { BotWithRelations } from "@/lib/types";
 import { useRouter } from "next/navigation";
-
-// Types
-enum BotTone {
-  PROFESSIONAL = "professional",
-  FRIENDLY = "friendly",
-  CASUAL = "casual",
-}
-enum AnswerStyle {
-  DETAILED = "detailed",
-  CONCISE = "concise",
-  BALANCED = "balanced",
-}
 
 type Message = {
   role: "user" | "bot";
@@ -62,8 +48,6 @@ export const Playground = ({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
-  console.log(`check`, selectedBot.widgets)
 
   useEffect(() => {
     scrollToBottom();
@@ -169,10 +153,9 @@ export const Playground = ({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        bot,
+        botId: bot.id,
         query,
-        // NEED TYO
-        contextChunks: bot.system_prompt,
+        history: currentMessages.slice(-12),
       }),
       signal,
     });

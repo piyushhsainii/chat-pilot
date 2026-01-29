@@ -1,7 +1,8 @@
 "use client";
 
 import { supabase } from "@/services/supabase";
-import React, { useEffect, useRef, useState } from "react";
+import { useDashboard } from "@/provider/DashboardContext";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MAX_FREE_BYTES = 25 * 1024 * 1024;
 
@@ -11,153 +12,216 @@ type Source = {
   path: string;
 };
 
+type KnowledgeSourceRow = {
+  id: string;
+  bot_id: string | null;
+  name: string;
+  type: "pdf" | "url" | "text" | null;
+  status: "processing" | "indexed" | "failed" | null;
+  last_indexed: string | null;
+  created_at: string | null;
+  doc_url: string[] | null;
+};
+
 const KnowledgeManager: React.FC<{
-  userId?: string;
-  botId?: string;
   plan?: "free" | "pro";
-}> = ({ userId = "test-user", botId = "123", plan = "free" }) => {
-  const [activeTab, setActiveTab] = useState<"upload" | "urls" | "text">(
-    "upload",
+}> = ({ plan = "free" }) => {
+  const { user, bots } = useDashboard();
+
+  const userId = user?.id ?? "test-user";
+
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
+  const selectedBot = useMemo(
+    () => bots?.find((b: any) => b.id === selectedBotId) ?? null,
+    [bots, selectedBotId],
   );
 
+  const [activeTab, setActiveTab] = useState<"upload" | "text">("upload");
+
   const [files, setFiles] = useState<Source[]>([]);
+  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceRow[]>(
+    [],
+  );
   const [usedBytes, setUsedBytes] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [urlInput, setUrlInput] = useState("");
-  const [isCrawling, setIsCrawling] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const bucket = "knowledge-files";
-  const basePath = `${userId}/${botId}`;
+  const basePath = selectedBotId ? `${userId}/${selectedBotId}` : null;
+
+  const loadKnowledgeSources = useCallback(async (botId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("knowledge_sources" as any)
+        .select(
+          "id, bot_id, name, type, status, last_indexed, created_at, doc_url",
+        )
+        .eq("bot_id", botId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error loading knowledge sources:", error);
+        return;
+      }
+
+      setKnowledgeSources(((data as unknown) as KnowledgeSourceRow[]) ?? []);
+    } catch (err) {
+      console.error("Failed to load knowledge sources:", err);
+    }
+  }, []);
+
+  const getSourceTypeFromName = useCallback((name: string) => {
+    const ext = name.split(".").pop()?.toLowerCase();
+    if (ext === "pdf") return "pdf" as const;
+    return "text" as const;
+  }, []);
+
+  const upsertKnowledgeSource = useCallback(
+    async ({
+      botId,
+      name,
+      type,
+      publicUrl,
+    }: {
+      botId: string;
+      name: string;
+      type: "pdf" | "text";
+      publicUrl: string;
+    }) => {
+      const { data: existing, error: existingError } = await supabase
+        .from("knowledge_sources" as any)
+        .select("id")
+        .eq("bot_id", botId)
+        .eq("name", name)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (existingError) {
+        console.error(
+          "Error checking existing knowledge source:",
+          existingError,
+        );
+        throw existingError;
+      }
+
+      const existingId = (existing as any[])?.[0]?.id as string | undefined;
+      if (existingId) {
+        const { error: updateError } = await supabase
+          .from("knowledge_sources" as any)
+          .update({ doc_url: [publicUrl], status: "processing", type } as any)
+          .eq("id", existingId);
+        if (updateError) throw updateError;
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from("knowledge_sources" as any)
+        .insert({ bot_id: botId, name, type, doc_url: [publicUrl] } as any);
+
+      if (insertError) throw insertError;
+    },
+    [],
+  );
+
+  const loadFiles = useCallback(
+    async (path: string) => {
+      try {
+        // List files in the specific path
+        const { data, error } = await supabase.storage.from(bucket).list(path, {
+          limit: 100,
+          offset: 0,
+        });
+
+        if (error) {
+          console.error("Error loading files:", error);
+          return;
+        }
+
+        const mapped =
+          data?.map((f) => ({
+            name: f.name,
+            size: f.metadata?.size || 0,
+            path: `${path}/${f.name}`,
+          })) || [];
+
+        setFiles(mapped);
+        setUsedBytes(mapped.reduce((sum, f) => sum + f.size, 0));
+      } catch (err) {
+        console.error("Failed to load files:", err);
+      }
+    },
+    [bucket],
+  );
 
   /* ---------------------------------------------
      Load files from Supabase
   --------------------------------------------- */
   useEffect(() => {
-    loadFiles();
-  }, []);
-
-  async function loadFiles() {
-    try {
-      // List files in the specific path
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .list(basePath, {
-          limit: 100,
-          offset: 0,
-        });
-
-      if (error) {
-        console.error("Error loading files:", error);
-        return;
-      }
-
-      const mapped =
-        data?.map((f) => ({
-          name: f.name,
-          size: f.metadata?.size || 0,
-          path: `${basePath}/${f.name}`,
-        })) || [];
-
-      setFiles(mapped);
-      setUsedBytes(mapped.reduce((sum, f) => sum + f.size, 0));
-    } catch (err) {
-      console.error("Failed to load files:", err);
+    if (bots && bots.length > 0 && !selectedBotId) {
+      setSelectedBotId(bots[0].id);
     }
-  }
+  }, [bots, selectedBotId]);
+
+  useEffect(() => {
+    if (!basePath) return;
+    loadFiles(basePath);
+  }, [basePath, loadFiles]);
+
+  useEffect(() => {
+    if (!selectedBotId) return;
+    loadKnowledgeSources(selectedBotId);
+  }, [selectedBotId, loadKnowledgeSources]);
 
   /* ---------------------------------------------
      Upload files
   --------------------------------------------- */
   async function uploadFiles(fileList: FileList) {
+    if (!basePath) return;
+    if (!selectedBotId) return;
     for (const file of Array.from(fileList)) {
       if (plan === "free" && usedBytes + file.size > MAX_FREE_BYTES) {
         alert("Free plan limit reached (25MB)");
         return;
       }
 
-      const { error } = await supabase.storage
-        .from(bucket)
-        .upload(`${basePath}/${file.name}`, file, {
-          upsert: true,
-        });
+      const storagePath = `${basePath}/${file.name}`;
 
-      if (error) {
-        alert(error.message);
-        return;
-      }
-    }
-    loadFiles();
-  }
-
-  /* ---------------------------------------------
-     Crawl URL and extract content
-  --------------------------------------------- */
-  async function crawlUrl() {
-    if (!urlInput.trim()) {
-      alert("Please enter a URL");
-      return;
-    }
-
-    setIsCrawling(true);
-    try {
-      // Fetch the URL content
-      const response = await fetch(urlInput);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.statusText}`);
-      }
-
-      const html = await response.text();
-
-      // Extract text content from HTML
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, "text/html");
-
-      // Remove script and style tags
-      const scripts = doc.querySelectorAll("script, style");
-      scripts.forEach((s) => s.remove());
-
-      // Get text content
-      const textContent = doc.body.textContent || doc.body.innerText || "";
-      const cleanText = textContent.replace(/\s+/g, " ").trim();
-
-      // Create a text file from the content
-      const fileName = `crawled_${new URL(urlInput).hostname}_${Date.now()}.txt`;
-      const blob = new Blob([`URL: ${urlInput}\n\n${cleanText}`], {
-        type: "text/plain",
+      const { error } = await supabase.storage.from(bucket).upload(storagePath, file, {
+        upsert: true,
       });
-      const file = new File([blob], fileName, { type: "text/plain" });
-
-      // Check size limit
-      if (plan === "free" && usedBytes + file.size > MAX_FREE_BYTES) {
-        alert("Free plan limit reached (25MB)");
-        setIsCrawling(false);
-        return;
-      }
-
-      // Upload to Supabase
-      const { error } = await supabase.storage
-        .from(bucket)
-        .upload(`${basePath}/${fileName}`, file, {
-          upsert: true,
-        });
 
       if (error) {
         alert(error.message);
-      } else {
-        setUrlInput("");
-        loadFiles();
-        alert("URL content successfully crawled and saved!");
+        return;
       }
-    } catch (error) {
-      console.error("Crawl error:", error);
-      alert(error instanceof Error ? error.message : "Failed to crawl URL");
-    } finally {
-      setIsCrawling(false);
+
+      const { data: publicData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(storagePath);
+      const publicUrl = publicData?.publicUrl;
+      if (!publicUrl) {
+        alert("Failed to generate public URL for uploaded file");
+        return;
+      }
+
+      try {
+        await upsertKnowledgeSource({
+          botId: selectedBotId,
+          name: file.name,
+          type: getSourceTypeFromName(file.name),
+          publicUrl,
+        });
+      } catch (e: any) {
+        console.error(e);
+        alert(e?.message ?? "Failed to save knowledge source");
+        return;
+      }
     }
+    loadFiles(basePath);
+    loadKnowledgeSources(selectedBotId);
   }
 
   /* ---------------------------------------------
@@ -171,6 +235,8 @@ const KnowledgeManager: React.FC<{
 
     setIsSaving(true);
     try {
+      if (!basePath) return;
+      if (!selectedBotId) return;
       const fileName = `text_${Date.now()}.txt`;
       const blob = new Blob([textInput], { type: "text/plain" });
       const file = new File([blob], fileName, { type: "text/plain" });
@@ -182,22 +248,38 @@ const KnowledgeManager: React.FC<{
         return;
       }
 
-      const { error } = await supabase.storage
-        .from(bucket)
-        .upload(`${basePath}/${fileName}`, file, {
-          upsert: true,
-        });
+      const storagePath = `${basePath}/${fileName}`;
+      const { error } = await supabase.storage.from(bucket).upload(storagePath, file, {
+        upsert: true,
+      });
 
       if (error) {
         alert(error.message);
       } else {
+        const { data: publicData } = supabase.storage
+          .from(bucket)
+          .getPublicUrl(storagePath);
+        const publicUrl = publicData?.publicUrl;
+        if (!publicUrl) {
+          alert("Failed to generate public URL for saved text");
+          return;
+        }
+
+        await upsertKnowledgeSource({
+          botId: selectedBotId,
+          name: fileName,
+          type: "text",
+          publicUrl,
+        });
+
         setTextInput("");
-        loadFiles();
+        loadFiles(basePath);
+        loadKnowledgeSources(selectedBotId);
         alert("Text successfully saved!");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Save error:", error);
-      alert("Failed to save text");
+      alert(error?.message ?? "Failed to save text");
     } finally {
       setIsSaving(false);
     }
@@ -207,13 +289,26 @@ const KnowledgeManager: React.FC<{
      Delete file
   --------------------------------------------- */
   async function deleteFile(path: string, size: number) {
+    if (!selectedBotId) return;
     const { error } = await supabase.storage.from(bucket).remove([path]);
     if (error) {
       alert(error.message);
       return;
     }
+
+    const name = path.split("/").pop() ?? path;
+    const { error: deleteRowError } = await supabase
+      .from("knowledge_sources" as any)
+      .delete()
+      .eq("bot_id", selectedBotId)
+      .eq("name", name);
+    if (deleteRowError) {
+      console.error("Failed to delete knowledge source row:", deleteRowError);
+    }
+
     setUsedBytes((b) => b - size);
-    loadFiles();
+    if (basePath) loadFiles(basePath);
+    loadKnowledgeSources(selectedBotId);
   }
 
   /* ---------------------------------------------
@@ -229,10 +324,45 @@ const KnowledgeManager: React.FC<{
 
   return (
     <div className="space-y-6">
+      {/* Bot picker */}
+      <div className="bg-white border rounded-xl p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">
+              Select Bot
+            </p>
+            <p className="text-sm font-semibold text-slate-800">
+              {selectedBot?.name ?? "Choose a bot to manage knowledge"}
+            </p>
+          </div>
+          <div className="text-xs text-slate-500">Storage is per bot</div>
+        </div>
+
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {(bots ?? []).map((b: any) => {
+            const active = b.id === selectedBotId;
+            return (
+              <button
+                key={b.id}
+                onClick={() => setSelectedBotId(b.id)}
+                className={`shrink-0 px-4 py-2 rounded-full border text-xs font-semibold transition whitespace-nowrap ${
+                  active
+                    ? "bg-indigo-50 border-indigo-300 text-indigo-700"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+                title={b.name}
+              >
+                {b.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="flex border-b">
-          {(["upload", "urls", "text"] as const).map((tab) => (
+          {(["upload", "text"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -244,9 +374,7 @@ const KnowledgeManager: React.FC<{
             >
               {tab === "upload"
                 ? "Upload Files"
-                : tab === "urls"
-                  ? "Crawl URLs"
-                  : "Raw Text"}
+                : "Raw Text"}
             </button>
           ))}
         </div>
@@ -277,17 +405,17 @@ const KnowledgeManager: React.FC<{
                   PDFs, DOCX, TXT — Max 25MB (Free)
                 </p>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,.txt,.docx"
-                  className="hidden"
-                  onChange={(e) =>
-                    e.target.files && uploadFiles(e.target.files)
-                  }
-                />
-              </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.txt,.docx"
+                    className="hidden"
+                    onChange={(e) =>
+                      e.target.files && uploadFiles(e.target.files)
+                    }
+                  />
+                </div>
 
               <p className="mt-4 text-sm text-slate-600">
                 Storage used:{" "}
@@ -295,36 +423,6 @@ const KnowledgeManager: React.FC<{
                 25 MB
               </p>
             </>
-          )}
-
-          {/* URLs */}
-          {activeTab === "urls" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Enter URL to crawl
-                </label>
-                <input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://docs.yourproduct.com"
-                  className="w-full border border-slate-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  disabled={isCrawling}
-                />
-              </div>
-              <button
-                onClick={crawlUrl}
-                disabled={isCrawling}
-                className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition disabled:bg-indigo-400 disabled:cursor-not-allowed"
-              >
-                {isCrawling ? "Crawling..." : "Start Crawling"}
-              </button>
-              <p className="text-sm text-slate-500">
-                The content will be extracted and saved as a text file in your
-                knowledge base.
-              </p>
-            </div>
           )}
 
           {/* Raw Text */}
@@ -356,7 +454,14 @@ const KnowledgeManager: React.FC<{
 
       {/* Knowledge Index */}
       <div className="bg-white border rounded-xl">
-        <div className="p-5 border-b font-bold">Knowledge Index</div>
+        <div className="p-5 border-b font-bold">
+          Knowledge Index
+          {selectedBot?.name ? (
+            <span className="ml-2 text-xs text-slate-500 font-semibold">
+              ({selectedBot.name})
+            </span>
+          ) : null}
+        </div>
 
         {files.length === 0 && (
           <p className="p-6 text-center text-slate-400">
@@ -364,26 +469,65 @@ const KnowledgeManager: React.FC<{
           </p>
         )}
 
-        {files.map((f) => (
-          <div
-            key={f.path}
-            className="p-4 flex justify-between items-center hover:bg-slate-50 transition"
-          >
-            <div>
-              <p className="font-medium">{f.name}</p>
-              <p className="text-xs text-slate-400">
-                {(f.size / 1024).toFixed(1)} KB
-              </p>
-            </div>
-            <button
-              onClick={() => deleteFile(f.path, f.size)}
-              className="text-red-500 hover:text-red-700 transition"
-              title="Delete"
+        {files.map((f) => {
+          const row = knowledgeSources.find((s) => s.name === f.name);
+          const status = row?.status ?? "processing";
+          const type = row?.type ?? getSourceTypeFromName(f.name);
+
+          const { data: publicData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(f.path);
+          const openUrl = row?.doc_url?.[0] ?? publicData?.publicUrl ?? null;
+
+          return (
+            <div
+              key={f.path}
+              className="p-4 flex justify-between items-center hover:bg-slate-50 transition"
             >
-              🗑️
-            </button>
-          </div>
-        ))}
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{f.name}</p>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase tracking-wide ${
+                      status === "indexed"
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        : status === "failed"
+                          ? "bg-red-50 border-red-200 text-red-700"
+                          : "bg-amber-50 border-amber-200 text-amber-700"
+                    }`}
+                  >
+                    {status}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-slate-200 text-slate-600 font-semibold uppercase tracking-wide bg-white">
+                    {type}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-3">
+                  <p className="text-xs text-slate-400">
+                    {(f.size / 1024).toFixed(1)} KB
+                  </p>
+                  {openUrl ? (
+                    <a
+                      href={openUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
+                    >
+                      Open
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+              <button
+                onClick={() => deleteFile(f.path, f.size)}
+                className="text-red-500 hover:text-red-700 transition"
+                title="Delete"
+              >
+                🗑️
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

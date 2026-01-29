@@ -3,12 +3,18 @@ import { validateBot } from "@/lib/bot/validateBot";
 import OpenAI from "openai";
 import { checkRateLimit } from "@/lib/checkrateLimit";
 import { createClient } from "@/lib/supabase/server";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+import { buildKnowledgeContext } from "@/lib/knowledge/buildKnowledgeContext";
 
 export async function POST(req: NextRequest) {
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: "Missing OPENAI_API_KEY" },
+      { status: 500 },
+    );
+  }
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0] ||
     req.headers.get("x-real-ip") ||
@@ -51,11 +57,30 @@ export async function POST(req: NextRequest) {
   }
 
   // 4️⃣ Build system prompt
+  const { data: sources } = await supabaseServer
+    .from("knowledge_sources" as any)
+    .select("name, type, status, doc_url")
+    .eq("bot_id", botId)
+    .neq("status", "failed")
+    .order("created_at", { ascending: false });
+
+  const { contextText } = await buildKnowledgeContext(
+    ((sources as any[]) ?? []) as any,
+  );
+
   const systemPrompt = `
 You are an AI assistant for "${bot.name}".
 
 Instructions:
 ${bot.system_prompt || "Be helpful and concise."}
+
+Rules:
+- Use the knowledge context below to answer.
+- If you cannot find the answer in the knowledge, reply with: "${
+    bot.fallback_behavior || "Sorry, I could not answer that."
+  }"
+
+${contextText}
   `.trim();
 
   // 5️⃣ Call LLM

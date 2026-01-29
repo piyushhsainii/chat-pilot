@@ -1,28 +1,72 @@
 
-import React from 'react';
+import React from "react";
 
 const advantages = [
-  { title: "Works across channels", desc: "Deploy to Slack, WhatsApp, Messenger, and more with one click.", img: "https://picsum.photos/seed/ch/400/250" },
-  { title: "Secure by default", desc: "Data encryption in transit and at rest. SOC 2 compliant storage.", img: "https://picsum.photos/seed/sc/400/250" },
-  { title: "Enterprise quality guardrails", desc: "Control response constraints and block unwanted topics effortlessly.", img: "https://picsum.photos/seed/gr/400/250" },
-  { title: "Handles unclear requests", desc: "Asks clarifying questions instead of guessing intent.", img: "https://picsum.photos/seed/uq/400/250" },
-  { title: "80+ Languages", desc: "Multilingual support for global customer bases out of the box.", img: "https://picsum.photos/seed/lang/400/250" },
+  {
+    title: "Works across channels",
+    desc: "Deploy to web, Slack, WhatsApp, and more with one configuration.",
+    img: "https://picsum.photos/seed/ch/900/600",
+    wide: true,
+  },
+  {
+    title: "Secure by default",
+    desc: "Encryption in transit and at rest, with modern access controls.",
+    img: "https://picsum.photos/seed/sc/900/600",
+  },
+  {
+    title: "Quality guardrails",
+    desc: "Constrain answers, block topics, and reduce hallucinations.",
+    img: "https://picsum.photos/seed/gr/900/600",
+  },
+  {
+    title: "Clarifies uncertainty",
+    desc: "Asks the right question before it answers.",
+    img: "https://picsum.photos/seed/uq/900/600",
+  },
+  {
+    title: "Global ready",
+    desc: "Multilingual support for worldwide customer bases.",
+    img: "https://picsum.photos/seed/lang/900/600",
+  },
 ];
 
 const Advantages: React.FC = () => {
   return (
-    <section className="py-24 bg-white overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-16 text-center">Unlock the power of AI-driven Agents</h2>
-        
-        <div className="flex gap-6 overflow-x-auto pb-12 snap-x hide-scrollbar">
-          {advantages.map((adv, i) => (
-            <div key={i} className="min-w-[320px] md:min-w-[400px] snap-center bg-slate-50 rounded-3xl p-6 border border-slate-100 hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
-              <div className="rounded-2xl overflow-hidden mb-6 aspect-video bg-slate-200">
-                <img src={adv.img} alt={adv.title} className="w-full h-full object-cover" />
+    <section className="py-20 md:py-28 bg-white">
+      <div className="max-w-6xl mx-auto px-4 md:px-8">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            Built for deployment
+          </p>
+          <h2 className="mt-3 text-3xl md:text-4xl font-semibold tracking-tight text-zinc-950">
+            Powerful fundamentals, no complexity
+          </h2>
+          <p className="mt-4 text-base text-zinc-600 leading-relaxed">
+            The features that matter to reliability, safety, and scale.
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
+          {advantages.map((adv: any) => (
+            <div
+              key={adv.title}
+              className={`rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_14px_50px_-40px_rgba(0,0,0,0.35)] hover:shadow-[0_20px_70px_-50px_rgba(0,0,0,0.45)] transition ${
+                adv.wide ? "md:col-span-2" : ""
+              }`}
+            >
+              <div className="rounded-2xl overflow-hidden border border-zinc-200 bg-zinc-50">
+                <img
+                  src={adv.img}
+                  alt={adv.title}
+                  className="w-full h-40 md:h-44 object-cover saturate-0 contrast-110"
+                />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-3">{adv.title}</h3>
-              <p className="text-slate-600 leading-relaxed">{adv.desc}</p>
+              <h3 className="mt-6 text-lg font-semibold text-zinc-950">
+                {adv.title}
+              </h3>
+              <p className="mt-2 text-sm text-zinc-600 leading-relaxed">
+                {adv.desc}
+              </p>
             </div>
           ))}
         </div>

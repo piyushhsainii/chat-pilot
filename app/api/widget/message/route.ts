@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { buildKnowledgeContext } from "@/lib/knowledge/buildKnowledgeContext";
 
 export async function POST(req: Request) {
   const { session_id, message } = await req.json();
-  const openai = new OpenAI();
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   if (!session_id || !message) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
@@ -25,19 +26,42 @@ export async function POST(req: Request) {
   // 2. Load bot + settings
   const { data: bot } = await supabase
     .from("bots")
-    .select("system_prompt")
+    .select("id, name, system_prompt, fallback_behavior")
     .eq("id", session.bot_id)
     .single();
 
-  // 3. Load knowledge (stub for now)
-  const knowledgeContext = ""; // ← plug your embeddings later
+  // 3. Load knowledge
+  const { data: sources } = await supabase
+    .from("knowledge_sources" as any)
+    .select("name, type, status, doc_url")
+    .eq("bot_id", session.bot_id)
+    .neq("status", "failed")
+    .order("created_at", { ascending: false });
+
+  const { contextText } = await buildKnowledgeContext(
+    ((sources as any[]) ?? []) as any,
+  );
+
+  const system = `
+You are an AI assistant for "${(bot as any)?.name || "this bot"}".
+
+Instructions:
+${(bot as any)?.system_prompt || "Be helpful and concise."}
+
+Rules:
+- Use the knowledge context below to answer.
+- If you cannot find the answer in the knowledge, reply with: "${
+    (bot as any)?.fallback_behavior || "Sorry, I could not answer that."
+  }"
+
+${contextText}
+`.trim();
 
   // 4. Call LLM
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: bot?.system_prompt ?? "" },
-      { role: "system", content: knowledgeContext },
+      { role: "system", content: system },
       { role: "user", content: message },
     ],
   });

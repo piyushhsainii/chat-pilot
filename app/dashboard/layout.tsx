@@ -1,8 +1,8 @@
 import Sidebar from "@/components/Sidebar";
 import { getWorkspaceData } from "@/lib/getWorkspaceData";
 import { createClient } from "@/lib/supabase/server";
-import { WorkspaceUserWithWorkspace } from "@/lib/types";
 import DashboardHydrator from "@/provider/DashboardHydrator";
+import DashboardProvider from "@/provider/DashboardProvider";
 import { redirect } from "next/navigation";
 
 export default async function RootLayout({
@@ -28,20 +28,28 @@ export default async function RootLayout({
   }
   return (
     <>
-      <DashboardHydrator
+      <DashboardProvider
         data={{
-          bots: workspaceData.bots,
           user,
-          // @ts-ignore
-          workspaces: workspaceData.workspaces
+          workspace: workspaceData.workspaces,
+          bots: workspaceData.bots ?? [],
         }}
-      />
-      <div className="flex min-h-screen bg-slate-50 font-sans antialiased text-slate-900 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 p-8 transition-all duration-300 max-w-full overflow-y-auto overflow-x-hidden">
-          {children}
-        </main>
-      </div>
+      >
+        <DashboardHydrator
+          data={{
+            bots: workspaceData.bots,
+            user,
+            // @ts-ignore
+            workspaces: workspaceData.workspaces,
+          }}
+        />
+        <div className="flex min-h-screen bg-slate-50 font-sans antialiased text-slate-900 overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 p-8 transition-all duration-300 max-w-full overflow-y-auto overflow-x-hidden">
+            {children}
+          </main>
+        </div>
+      </DashboardProvider>
     </>
   );
 }

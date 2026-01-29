@@ -1,38 +1,85 @@
 
-import React from 'react';
+import React from "react";
 
 const Security: React.FC = () => {
   const securityFeatures = [
-    { icon: '🗄️', title: "Your data stays yours", desc: "We never use your data to train our base models." },
-    { icon: '🔒', title: "Data encryption", desc: "All data is encrypted in transit (TLS 1.2+) and at rest (AES-256)." },
-    { icon: '🧊', title: "Secure integrations", desc: "Isolated sandboxes for all API actions and executions." },
-    { icon: '🛡️', title: "Active monitoring", desc: "24/7 automated vulnerability scanning and SOC reporting." }
+    {
+      title: "Your data stays yours",
+      desc: "We don’t use your content to train base models. You control retention and access.",
+    },
+    {
+      title: "Encryption by default",
+      desc: "Traffic is encrypted in transit and data is encrypted at rest.",
+    },
+    {
+      title: "Scoped integrations",
+      desc: "Connect tools with least-privilege access and clear audit trails.",
+    },
+    {
+      title: "Monitoring & controls",
+      desc: "Operational guardrails for reliability and security posture.",
+    },
   ];
 
   return (
-    <section className="py-24 bg-white border-y border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <div className="flex flex-col lg:flex-row gap-16 items-center">
-          <div className="w-full lg:w-1/3">
-            <h2 className="text-3xl font-bold text-slate-900 mb-6">Enterprise-grade security & privacy</h2>
-            <p className="text-slate-600 mb-8 leading-relaxed">We maintain the highest standards of security to ensure your customers' data and your business assets are always protected.</p>
-            <div className="flex gap-4 mb-8">
-               <div className="w-16 h-16 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center font-bold text-[10px] text-slate-400">SOC 2 TYPE II</div>
-               <div className="w-16 h-16 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center font-bold text-[10px] text-slate-400">GDPR</div>
+    <section id="security" className="py-20 md:py-28 bg-white border-y border-zinc-200">
+      <div className="max-w-6xl mx-auto px-4 md:px-8">
+        <div className="grid gap-10 lg:grid-cols-3 lg:items-start">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              Security
+            </p>
+            <h2 className="mt-3 text-3xl md:text-4xl font-semibold tracking-tight text-zinc-950">
+              Enterprise-grade security and privacy
+            </h2>
+            <p className="mt-4 text-base text-zinc-600 leading-relaxed">
+              Designed to protect your customer data and your internal systems.
+              Clear controls, predictable behavior.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-semibold text-zinc-700">
+                SOC 2 Type II
+              </span>
+              <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-semibold text-zinc-700">
+                GDPR
+              </span>
+              <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-semibold text-zinc-700">
+                TLS
+              </span>
+              <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-semibold text-zinc-700">
+                Encryption at rest
+              </span>
             </div>
-            <a href="#" className="text-indigo-600 font-bold hover:underline flex items-center gap-2">
-              Learn more about our trust center →
+
+            <a
+              href="#"
+              className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-zinc-950 hover:opacity-80 transition"
+            >
+              Trust center
+              <span className="text-zinc-400">→</span>
             </a>
           </div>
 
-          <div className="w-full lg:w-2/3 grid sm:grid-cols-2 gap-8">
-             {securityFeatures.map((f, i) => (
-               <div key={i} className="p-8 rounded-2xl bg-slate-50 border border-slate-100 group hover:bg-white hover:shadow-lg transition-all">
-                 <div className="text-4xl mb-4 grayscale group-hover:grayscale-0 transition-all">{f.icon}</div>
-                 <h4 className="text-xl font-bold text-slate-900 mb-2">{f.title}</h4>
-                 <p className="text-slate-600 text-sm leading-relaxed">{f.desc}</p>
-               </div>
-             ))}
+          <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
+            {securityFeatures.map((f) => (
+              <div
+                key={f.title}
+                className="rounded-3xl border border-zinc-200 bg-zinc-50 p-6"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-2xl border border-zinc-200 bg-white flex items-center justify-center">
+                    <span className="h-2 w-2 rounded-full bg-sky-400" />
+                  </div>
+                  <div className="text-sm font-semibold text-zinc-950">
+                    {f.title}
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-zinc-600 leading-relaxed">
+                  {f.desc}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
