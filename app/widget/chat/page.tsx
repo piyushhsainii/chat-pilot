@@ -261,11 +261,30 @@ function WidgetChatContent() {
         }
     }
 
-    // Safe config access with defaults
-    const primaryColor = config?.widget?.primaryColor || config?.primaryColor || "#6366f1";
-    const textColor = config?.widget?.textColor || config?.textColor || "#ffffff";
+    // Safe config access with defaults - check all possible paths
+    const primaryColor = config?.widget?.primaryColor
+        || config?.widget?.primary_color
+        || config?.primaryColor
+        || config?.primary_color
+        || config?.primary
+        || (config?.widget?.primary ? `#${config.widget.primary}` : null)
+        || (config?.primary ? `#${config.primary}` : null)
+        || "#6366f1";
+
+    const textColor = config?.widget?.textColor
+        || config?.widget?.text_color
+        || config?.textColor
+        || config?.text_color
+        || config?.text
+        || (config?.widget?.text ? `#${config.widget.text}` : null)
+        || (config?.text ? `#${config.text}` : null)
+        || "#ffffff";
+
     const theme = config?.widget?.theme || config?.theme || "light";
-    const botName = config?.widget?.title || config?.title || "Chat Pilot";
+    const botName = config?.widget?.title || config?.widget?.name || config?.title || config?.name || "Chat Pilot";
+
+    // Log colors for debugging
+    console.log("[Widget] Colors configured:", { primaryColor, textColor, theme, botName });
 
     // Error state
     if (error && !config) {
@@ -509,8 +528,17 @@ function WidgetChatContent() {
                 alignItems: "center",
                 gap: "4px",
                 marginTop: "12px",
-                paddingTop: "12px",
-                opacity: 0.35,
+                paddingTop: "8px",
+                borderTop: theme === "dark" ? "1px solid #1e293b" : "1px solid #f8fafc",
+            },
+            brandingLink: {
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                textDecoration: "none",
+                opacity: 0.4,
+                transition: "opacity 0.2s",
+                cursor: "pointer",
             },
             brandingContent: {
                 display: "flex",
@@ -530,9 +558,10 @@ function WidgetChatContent() {
                 fontSize: "10px",
                 fontWeight: 600,
                 letterSpacing: "-0.01em",
+                color: theme === "dark" ? "#94a3b8" : "#64748b",
             },
             footer: {
-                padding: "16px 24px 24px",
+                padding: "16px 24px 16px",
                 borderTop: theme === "dark" ? "1px solid #1e293b" : "1px solid #f1f5f9",
                 flexShrink: 0,
                 backgroundColor: theme === "dark" ? "#0f172a" : "#ffffff",
@@ -627,14 +656,6 @@ function WidgetChatContent() {
                         </div>
                     )}
 
-                    {/* Branding */}
-                    <div style={embeddedStyles.branding}>
-                        <div style={embeddedStyles.brandingContent}>
-                            <span style={embeddedStyles.brandingBadge}>CP</span>
-                            <span style={embeddedStyles.brandingText}>Powered by Chat Pilot</span>
-                        </div>
-                    </div>
-
                     {/* Invisible element for auto-scroll */}
                     <div ref={messagesEndRef} />
                 </div>
@@ -687,6 +708,21 @@ function WidgetChatContent() {
                                 <span>➔</span>
                             )}
                         </button>
+                    </div>
+
+                    {/* Branding - Now in footer */}
+                    <div style={embeddedStyles.branding}>
+                        <a
+                            href="https://chat-pilot-agent.vercel.app/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={embeddedStyles.brandingLink}
+                            onMouseOver={(e) => e.currentTarget.style.opacity = "0.6"}
+                            onMouseOut={(e) => e.currentTarget.style.opacity = "0.4"}
+                        >
+                            <span style={embeddedStyles.brandingBadge}>CP</span>
+                            <span style={embeddedStyles.brandingText}>Powered by Chat Pilot</span>
+                        </a>
                     </div>
                 </div>
             </div>
