@@ -33,7 +33,7 @@ function WidgetChatContent() {
             }
             
             body {
-                font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                 -webkit-font-smoothing: antialiased;
                 -moz-osx-font-smoothing: grayscale;
             }
@@ -296,7 +296,7 @@ function WidgetChatContent() {
                 justifyContent: "center",
                 height: "100vh",
                 padding: "24px",
-                fontFamily: "system-ui, -apple-system, sans-serif",
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
                 textAlign: "center",
                 backgroundColor: "#fef2f2",
             }}>
@@ -346,7 +346,7 @@ function WidgetChatContent() {
                 alignItems: "center",
                 justifyContent: "center",
                 height: "100vh",
-                fontFamily: "system-ui, -apple-system, sans-serif",
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
                 color: "#64748b",
                 gap: "16px",
             }}>
@@ -372,7 +372,7 @@ function WidgetChatContent() {
                 flexDirection: "column" as const,
                 backgroundColor: theme === "dark" ? "#0f172a" : "#ffffff",
                 color: theme === "dark" ? "#ffffff" : "#0f172a",
-                fontFamily: "system-ui, -apple-system, sans-serif",
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
             },
             header: {
                 padding: "20px 24px",
@@ -733,7 +733,7 @@ function WidgetChatContent() {
     return (
         <div style={{
             padding: "24px",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
             textAlign: "center",
         }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>💬</div>
@@ -755,7 +755,7 @@ export default function WidgetChat() {
                 alignItems: "center",
                 justifyContent: "center",
                 height: "100vh",
-                fontFamily: "system-ui, -apple-system, sans-serif",
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
                 color: "#64748b",
                 flexDirection: "column",
                 gap: "16px"

@@ -1,7 +1,9 @@
 "use client";
+import { supabase } from "@/services/supabase";
 import { useDashboardStore } from "@/store/dashboardStore";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 type ConfigCheck = {
   label: string;
@@ -12,14 +14,24 @@ const DeployManager: React.FC = () => {
   const { bots, workspaces } = useDashboardStore();
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const selectedBot = bots?.find((se) => se.id == selectedBotId)
-  const [theme, setTheme] = useState<"light" | "dark">((selectedBot?.widgets?.theme as "light" | "dark") ?? "light");
-  const [primaryColor, setPrimaryColor] = useState(selectedBot?.widgets?.primary_color ?? "#6366f1");
-  const [textColor, setTextColor] = useState(selectedBot?.widgets?.button_color ?? "#ffffff");
+  const [theme, setTheme] = useState<"light" | "dark">((selectedBot?.widgets?.theme as "light" | "dark"));
+  const [primaryColor, setPrimaryColor] = useState(selectedBot?.widgets?.primary_color ?? "#");
+  const [textColor, setTextColor] = useState(selectedBot?.widgets?.button_color ?? "#");
   const [activeTab, setActiveTab] = useState<"content" | "style" | "embed">(
     "style",
   );
+  const [originalConfig, setOriginalConfig] = useState({
+    theme: selectedBot?.widgets?.theme as "light" | "dark",
+    primaryColor: selectedBot?.widgets?.primary_color,
+    textColor: selectedBot?.widgets?.button_color,
+    botName: selectedBot?.name,
+    welcomeMessage: selectedBot?.widgets?.greeting_message,
+    allowedDomains: [] as string[],
+  });
   const [isWidgetOpen, setIsWidgetOpen] = useState(true);
-
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [botName, setBotName] = useState(selectedBot?.name ?? "Chat Pilot Assistant");
   const [welcomeMessage, setWelcomeMessage] = useState(
     selectedBot?.widgets?.greeting_message,
@@ -39,12 +51,12 @@ const DeployManager: React.FC = () => {
 
   const botId = selectedBot?.id + Math.random().toString(36).substr(2, 6);
 
-  const addDomain = () => {
-    if (domainInput && !allowedDomains.includes(domainInput)) {
-      setAllowedDomains([...allowedDomains, domainInput]);
+  function addDomain() {
+    if (domainInput.trim() && !allowedDomains.includes(domainInput.trim())) {
+      setAllowedDomains([...allowedDomains, domainInput.trim()]);
       setDomainInput("");
     }
-  };
+  }
 
   useEffect(() => {
     if (!selectedBot) return;
@@ -62,13 +74,20 @@ const DeployManager: React.FC = () => {
     );
 
     setBotName(
-      selectedBot.name ?? "Chat Pilot Assistant"
+      selectedBot?.widgets?.title ?? "Chat Pilot Assistant"
     );
 
     setWelcomeMessage(
       selectedBot.widgets?.greeting_message ?? ""
     );
-
+    setOriginalConfig({
+      theme: selectedBot?.widgets?.theme as "light" | "dark",
+      primaryColor: selectedBot?.widgets?.primary_color,
+      textColor: selectedBot?.widgets?.button_color,
+      botName: selectedBot?.widgets?.title ?? "",
+      welcomeMessage: selectedBot?.widgets?.greeting_message,
+      allowedDomains: [] as string[],
+    })
     const domains = selectedBot.bot_settings?.allowed_domains || [];
 
     if (!domains) {
@@ -89,10 +108,11 @@ const DeployManager: React.FC = () => {
     }
   }, [bots]);
 
-  const removeDomain = (domain: string) => {
-    setAllowedDomains(allowedDomains.filter((d) => d !== domain));
-  };
 
+
+  function removeDomain(domain: string) {
+    setAllowedDomains(allowedDomains.filter((d) => d !== domain));
+  }
 
   const getBotConfigChecks = (bot: any): ConfigCheck[] => {
     return [
@@ -135,6 +155,81 @@ const DeployManager: React.FC = () => {
   const isBotFullyConfigured = (bot: any) => {
     return getBotConfigChecks(bot).every((c) => c.valid);
   };
+
+  useEffect(() => {
+    const hasChanged =
+      theme !== originalConfig.theme ||
+      primaryColor !== originalConfig.primaryColor ||
+      textColor !== originalConfig.textColor ||
+      botName !== originalConfig.botName ||
+      welcomeMessage !== originalConfig.welcomeMessage ||
+      JSON.stringify(allowedDomains) !== JSON.stringify(originalConfig.allowedDomains);
+    setHasChanges(hasChanged);
+
+    // Clear success message when user makes new changes
+    if (hasChanged && saveSuccess) {
+      setSaveSuccess(false);
+    }
+  }, [theme, primaryColor, textColor, botName, welcomeMessage, allowedDomains, saveSuccess]);
+  console.log(primaryColor)
+  console.log(botId)
+  // Save changes
+  async function saveChanges() {
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      const { data } = await supabase.from("widgets").update({
+        primary_color: primaryColor,
+        greeting_message: welcomeMessage,
+        button_color: textColor,
+        theme: theme,
+        title: botName,
+      }).eq("bot_id", selectedBot?.id!).select('*').single()
+
+      if (!data) {
+        toast("Failed to save");
+        discardChanges()
+        return;
+      }
+
+      // Update original config to match current state
+      const newConfig = {
+        theme,
+        primaryColor,
+        textColor,
+        botName,
+        welcomeMessage,
+        allowedDomains,
+      };
+
+      setOriginalConfig(newConfig);
+      setHasChanges(false);
+      setSaveSuccess(true);
+
+      // Hide success message after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error("Failed to save:", error);
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // Discard changes
+  function discardChanges() {
+    setTheme((selectedBot?.widgets?.theme as "light" | "dark") ?? "light");
+    setPrimaryColor(selectedBot?.widgets?.primary_color ?? "");
+    setTextColor(selectedBot?.widgets?.button_color ?? "");
+    setBotName(selectedBot?.name ?? "");
+    setWelcomeMessage(selectedBot?.widgets?.greeting_message);
+    setAllowedDomains(selectedBot?.bot_settings?.allowed_domains || []);
+    setHasChanges(false);
+  }
+
+
+
 
   const embedCode = `<script
   src="https://chat-pilot-agent.vercel.app/v1/widget.js"
@@ -305,16 +400,70 @@ const DeployManager: React.FC = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-8 space-y-10">
+            {hasChanges && (
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                    <span className="text-sm font-semibold tracking-tight">
+                      You have unsaved changes
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={discardChanges}
+                      disabled={isSaving}
+                      className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white transition-colors rounded-lg hover:bg-white/10 tracking-tight disabled:opacity-50"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      onClick={saveChanges}
+                      disabled={isSaving}
+                      className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 tracking-tight disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <span>💾</span>
+                          Save Changes
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {saveSuccess && (
+              <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-top-4 duration-300">
+                <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+                  <span className="text-xl">✓</span>
+                  <span className="text-sm font-semibold tracking-tight">
+                    Changes saved successfully!
+                  </span>
+                </div>
+              </div>
+            )}
+
             {activeTab === "style" && (
               <div className="space-y-10 animate-in slide-in-from-left-4 duration-300">
                 <section className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest tracking-tighter">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
                     Interface Theme
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       onClick={() => setTheme("light")}
-                      className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "light" ? "border-indigo-600 bg-indigo-50/20" : "border-slate-100 bg-white"}`}
+                      className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "light"
+                        ? "border-indigo-600 bg-indigo-50/20"
+                        : "border-slate-100 bg-white"
+                        }`}
                     >
                       <div className="aspect-video bg-white border border-slate-200 rounded-lg mb-3 flex flex-col p-2 gap-1.5 overflow-hidden">
                         <div className="flex items-center gap-1.5">
@@ -330,7 +479,10 @@ const DeployManager: React.FC = () => {
                     </button>
                     <button
                       onClick={() => setTheme("dark")}
-                      className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "dark" ? "border-indigo-600 bg-indigo-50/20" : "border-slate-100 bg-white"}`}
+                      className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "dark"
+                        ? "border-indigo-600 bg-indigo-50/20"
+                        : "border-slate-100 bg-white"
+                        }`}
                     >
                       <div className="aspect-video bg-slate-900 border border-slate-800 rounded-lg mb-3 flex flex-col p-2 gap-1.5 overflow-hidden">
                         <div className="flex items-center gap-1.5">
@@ -349,7 +501,7 @@ const DeployManager: React.FC = () => {
 
                 <section className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest tracking-tighter">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
                       Brand Colors
                     </h3>
                   </div>
@@ -394,7 +546,7 @@ const DeployManager: React.FC = () => {
             {activeTab === "content" && (
               <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
                 <section className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest tracking-tighter">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
                     Bot Identity
                   </h3>
                   <div className="space-y-6">
@@ -429,13 +581,13 @@ const DeployManager: React.FC = () => {
             {activeTab === "embed" && (
               <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
                 <section className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest tracking-tighter">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
                     Embed Options
                   </h3>
 
                   <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
                     <div className="flex justify-between items-center mb-4">
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest tracking-tighter">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">
                         Global Widget Script
                       </span>
                       <button
@@ -452,7 +604,7 @@ const DeployManager: React.FC = () => {
 
                   <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
                     <div className="flex justify-between items-center mb-4">
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest tracking-tighter">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
                         iFrame Embed
                       </span>
                       <button
@@ -468,7 +620,7 @@ const DeployManager: React.FC = () => {
                   </div>
 
                   <div className="pt-6 space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest tracking-tighter">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
                       Security Whitelist
                     </h3>
                     <p className="text-xs text-slate-500 tracking-tighter">
@@ -479,6 +631,11 @@ const DeployManager: React.FC = () => {
                         type="text"
                         value={domainInput}
                         onChange={(e) => setDomainInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            addDomain();
+                          }
+                        }}
                         placeholder="myapp.com"
                         className="flex-1 bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-medium focus:border-indigo-500 outline-none tracking-tighter"
                       />
@@ -509,6 +666,7 @@ const DeployManager: React.FC = () => {
                 </section>
               </div>
             )}
+
           </div>
         </div>
 
@@ -523,10 +681,6 @@ const DeployManager: React.FC = () => {
               backgroundSize: "32px 32px",
             }}
           />
-
-
-
-
           <div className="text-center mb-10">
             <h4 className="text-slate-400 font-black text-xs uppercase tracking-[0.4em] mb-2 tracking-tighter">
               Live Preview

@@ -128,6 +128,22 @@
         embedded: "true",
       });
 
+      // Convert hex to RGB for shadow
+      const hexToRgb = (hex) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result
+          ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16),
+            }
+          : { r: 99, g: 102, b: 241 }; // fallback to default indigo
+      };
+
+      const rgb = hexToRgb(`#${this.config.primary}`);
+      const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`;
+      const shadowColorHover = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+
       return `
 <style>
   * {
@@ -138,7 +154,9 @@
 
   .wrapper {
     position: relative;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   iframe {
@@ -172,17 +190,20 @@
     border: none;
     cursor: pointer;
     font-size: 26px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 25px ${shadowColor};
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, system-ui, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.02em;
   }
 
   .trigger:hover {
     transform: scale(1.1);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 15px 35px ${shadowColorHover};
   }
 
   .trigger:active {
