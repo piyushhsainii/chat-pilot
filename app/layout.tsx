@@ -85,6 +85,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          src="https://chat-pilot-agent.vercel.app/widget.js"
+          data-bot-id="38fcdfb6-a8b6-44f4-89a2-3c0116df8816"
+          defer
+        ></script>
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

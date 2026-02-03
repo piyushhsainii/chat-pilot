@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import BotCard from "./BotCard";
 import NewAgentStepper from "./NewAgentStepper";
 import { motion } from "framer-motion";
@@ -10,6 +10,26 @@ import { useDashboardStore } from "@/store/dashboardStore";
 const Agents = () => {
   const { bots } = useDashboardStore()
   const [showNewAgent, setShowNewAgent] = useState(false);
+  const [summary, setSummary] = useState<{
+    perBot: Record<string, { totalMessages: number; connectors: string[] }>;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/dashboard/agents/summary");
+        if (!res.ok) return;
+        const json = (await res.json()) as any;
+        if (!cancelled) setSummary(json);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -62,7 +82,11 @@ const Agents = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {bots && bots.map((bot) => (
-            <BotCard key={bot.id} bot={bot} />
+            <BotCard
+              key={bot.id}
+              bot={bot}
+              stats={summary?.perBot?.[bot.id]}
+            />
           ))}
         </div>
       </div>

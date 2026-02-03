@@ -2,11 +2,17 @@ type GenerateChatHTMLParams = {
   botId: string;
   name: string;
   theme: "light" | "dark";
-  primary: string; // hex without #
-  textColor: string; // hex without #
+  primary: string; // hex with or without #
+  textColor: string; // hex with or without #
   welcomeMessage: string;
   embedded: boolean;
 };
+
+function normalizeHexNoHash(input: string, fallback: string) {
+  const raw = String(input ?? "").trim();
+  const cleaned = raw.replace(/^#+/, "");
+  return cleaned || fallback;
+}
 
 export function generateChatHTML({
   botId,
@@ -17,6 +23,9 @@ export function generateChatHTML({
   welcomeMessage,
   embedded,
 }: GenerateChatHTMLParams) {
+  const primaryNoHash = normalizeHexNoHash(primary, "");
+  const textNoHash = normalizeHexNoHash(textColor, "ffffff");
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -31,8 +40,8 @@ export function generateChatHTML({
         botId: "${botId}",
         name: "${name}",
         theme: "${theme}",
-        primary: "#${primary}",
-        textColor: "#${textColor}",
+        primary: "#${primaryNoHash}",
+        textColor: "#${textNoHash}",
         welcomeMessage: "${welcomeMessage}",
         embedded: ${embedded}
       };

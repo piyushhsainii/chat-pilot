@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { ensureTrialCreditsForUser } from "@/lib/billing/credits";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -47,6 +48,14 @@ export async function GET(request: Request) {
         );
       }
       return NextResponse.redirect(`${origin}/login?error=session_exchange`); // ✅ Fixed
+    }
+
+    // Initialize trial credits (first login)
+    try {
+      await ensureTrialCreditsForUser(data.user.id);
+    } catch (e) {
+      // Non-blocking: credits can be created later from the dashboard.
+      console.error("Failed to ensure trial credits", e);
     }
 
     // 2️⃣ Check onboarding status

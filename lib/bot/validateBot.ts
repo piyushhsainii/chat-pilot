@@ -9,6 +9,7 @@ export async function validateBot(botId: string, referer?: string | null) {
       `
       id,
       name,
+      owner_id,
       system_prompt,
       fallback_behavior,
       widgets (

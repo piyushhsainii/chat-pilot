@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   // 1. Load bot
   const { data: bot } = await supabase
     .from("bots")
-    .select("id, name, owner_id")
+    .select("id, name, owner_id, tone")
     .eq("id", botId)
     .single();
   if (!bot) {
@@ -53,6 +53,7 @@ export async function GET(req: Request) {
     bot: {
       id: bot.id,
       name: bot.name,
+      tone: (bot as any)?.tone ?? null,
     },
     widget: {
       title: widget?.title ?? "AI Assistant",

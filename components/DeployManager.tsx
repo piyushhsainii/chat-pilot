@@ -49,7 +49,7 @@ const DeployManager: React.FC = () => {
   });
   const [domainInput, setDomainInput] = useState("");
 
-  const botId = selectedBot?.id + Math.random().toString(36).substr(2, 6);
+  const botId = selectedBot?.id ?? "";
 
   function addDomain() {
     if (domainInput.trim() && !allowedDomains.includes(domainInput.trim())) {
@@ -66,7 +66,7 @@ const DeployManager: React.FC = () => {
     );
 
     setPrimaryColor(
-      selectedBot.widgets?.primary_color ?? "#6366f1"
+      selectedBot.widgets?.primary_color ?? "#"
     );
 
     setTextColor(
@@ -231,17 +231,16 @@ const DeployManager: React.FC = () => {
 
 
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://chat-pilot-agent.vercel.app";
+
   const embedCode = `<script
-  src="https://chat-pilot-agent.vercel.app/v1/widget.js"
+  src="${baseUrl}/widget.js"
   data-bot-id="${botId}"
-  data-theme="${theme}"
-  data-primary="${primaryColor.replace("#", "")}"
-  data-name="${encodeURIComponent(botName)}"
   defer
 ></script>`;
 
   const iframeCode = `<iframe
-  src="https://chat-pilot-agent.vercel.app/widget/${botId}?theme=${theme}&primary=${primaryColor.replace("#", "")}&name=${encodeURIComponent(botName)}"
+  src="${baseUrl}/widget/chat?botId=${botId}&embedded=true"
   width="400"
   height="600"
   frameborder="0"

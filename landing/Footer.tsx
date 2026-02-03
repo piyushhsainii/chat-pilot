@@ -3,13 +3,13 @@ import React from "react";
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-zinc-950 text-white">
+    <footer id="contact" className="bg-zinc-950 text-white">
       <div className="max-w-6xl mx-auto px-4 md:px-8 pt-16 md:pt-20 pb-10">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-1">
             <div className="flex items-center gap-3">
               <img
-                src="/logo2.png"
+                src="/chat-pilot-logo.png"
                 alt="Chat Pilot"
                 className="h-9 w-auto opacity-90"
               />
@@ -23,14 +23,29 @@ const Footer: React.FC = () => {
             </p>
 
             <div className="mt-6 flex items-center gap-4 text-sm text-zinc-400">
-              <a href="#" className="hover:text-white transition">
+              <a
+                href="https://github.com/piyushhsainii"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition"
+              >
+                GitHub
+              </a>
+              <a
+                href="https://x.com/piyushsainii"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition"
+              >
                 X
               </a>
-              <a href="#" className="hover:text-white transition">
+              <a
+                href="https://www.linkedin.com/in/piyushhsainii/"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition"
+              >
                 LinkedIn
-              </a>
-              <a href="#" className="hover:text-white transition">
-                YouTube
               </a>
             </div>
           </div>
@@ -41,18 +56,18 @@ const Footer: React.FC = () => {
             </h5>
             <ul className="mt-5 space-y-3 text-sm text-zinc-300">
               <li>
-                <a href="#features" className="hover:text-white transition">
-                  Product
-                </a>
-              </li>
-              <li>
                 <a href="#how" className="hover:text-white transition">
                   How it works
                 </a>
               </li>
               <li>
-                <a href="#security" className="hover:text-white transition">
-                  Security
+                <a href="#services" className="hover:text-white transition">
+                  Services
+                </a>
+              </li>
+              <li>
+                <a href="#contact" className="hover:text-white transition">
+                  Contact
                 </a>
               </li>
             </ul>
@@ -74,7 +89,7 @@ const Footer: React.FC = () => {
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition">
+                <a href="#contact" className="hover:text-white transition">
                   Contact
                 </a>
               </li>

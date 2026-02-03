@@ -16,9 +16,9 @@ export async function GET(
   const html = generateChatHTML({
     botId,
     name: bot.widgets?.title || bot.name,
-    theme: "light",
-    primary: bot.widgets?.primary_color || "6366f1",
-    textColor: "ffffff",
+    theme: (bot.widgets?.theme as "light" | "dark") || "light",
+    primary: bot.widgets?.primary_color || "",
+    textColor: bot.widgets?.button_color || "ffffff",
     embedded: false,
     welcomeMessage: bot.widgets?.greeting_message || "Hi! How can I help you?",
   });

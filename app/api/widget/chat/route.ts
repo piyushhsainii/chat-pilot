@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
     botId,
     name: bot.widgets?.title || bot.name,
     theme: (bot.widgets?.theme as "light" | "dark") || "light",
-    primary: bot.widgets?.primary_color || "6366f1",
-    textColor: "ffffff",
+    primary: bot.widgets?.primary_color || "",
+    textColor: bot.widgets?.button_color || "ffffff",
     embedded: true,
     welcomeMessage: bot.widgets?.greeting_message || "Hi! How can I help you?",
   });

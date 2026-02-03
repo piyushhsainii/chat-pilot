@@ -19,6 +19,64 @@ function WidgetChatContent() {
     const [isFocused, setIsFocused] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    const toCssColor = (value: any, fallback: string) => {
+        if (!value || typeof value !== "string") return fallback;
+        const v = value.trim();
+        if (!v) return fallback;
+        return v.startsWith("#") ? v : `#${v}`;
+    };
+
+    const getToneSuggestions = (toneRaw: any, name: string) => {
+        const tone = String(toneRaw || "").toLowerCase();
+
+        if (tone.includes("fun") || tone.includes("humor") || tone.includes("witty")) {
+            return [
+                `Give me a quick overview of what you can do`,
+                `Make this explanation simple (and a bit fun)`,
+                `Help me solve a problem step-by-step`,
+            ];
+        }
+
+        if (tone.includes("friendly") || tone.includes("casual")) {
+            return [
+                `What can you help me with?`,
+                `Help me get started`,
+                `Show me the most common questions`,
+            ];
+        }
+
+        if (tone.includes("sales") || tone.includes("persuasive") || tone.includes("marketing")) {
+            return [
+                `What are the key benefits?`,
+                `What pricing or plans are available?`,
+                `Can you recommend the best option for me?`,
+            ];
+        }
+
+        if (tone.includes("support") || tone.includes("helpdesk") || tone.includes("technical")) {
+            return [
+                `I need help troubleshooting an issue`,
+                `Where can I find documentation?`,
+                `How do I contact support?`,
+            ];
+        }
+
+        if (tone.includes("empat") || tone.includes("caring")) {
+            return [
+                `I could use some guidance`,
+                `Help me understand my options`,
+                `Can you walk me through this gently?`,
+            ];
+        }
+
+        // Default / professional
+        return [
+            `What can ${name} help with?`,
+            `Summarize the key info for me`,
+            `Point me to the right resource`,
+        ];
+    };
+
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -123,6 +181,27 @@ function WidgetChatContent() {
                 setConfig(data);
                 setSessionId(data.session_id || data.sessionId || null);
 
+                // Let the outer widget (widget.js) style itself without relying on
+                // the host page being able to fetch cross-origin.
+                try {
+                    if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+                        window.parent.postMessage(
+                            {
+                                type: "chatpilot:config",
+                                payload: {
+                                    title: data?.widget?.title ?? data?.bot?.name ?? data?.title ?? data?.name ?? null,
+                                    primary_color: data?.widget?.primary_color ?? null,
+                                    button_color: data?.widget?.button_color ?? null,
+                                    text_color: data?.widget?.text_color ?? null,
+                                },
+                            },
+                            "*",
+                        );
+                    }
+                } catch {
+                    // ignore
+                }
+
                 // Safely get greeting message
                 const greeting = data.widget?.greeting
                     || data.greeting
@@ -147,6 +226,36 @@ function WidgetChatContent() {
         bootstrap();
     }, [botId, embedded]);
 
+    // Allow the outer widget.js to request config after load.
+    useEffect(() => {
+        if (!embedded) return;
+
+        const handler = (e: MessageEvent) => {
+            if (e.data?.type !== "chatpilot:config:request") return;
+            try {
+                if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+                    window.parent.postMessage(
+                        {
+                            type: "chatpilot:config",
+                            payload: {
+                                title: config?.widget?.title ?? config?.bot?.name ?? null,
+                                primary_color: config?.widget?.primary_color ?? null,
+                                button_color: config?.widget?.button_color ?? null,
+                                text_color: config?.widget?.text_color ?? null,
+                            },
+                        },
+                        "*",
+                    );
+                }
+            } catch {
+                // ignore
+            }
+        };
+
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, [embedded, config]);
+
     async function sendMessage(text: string) {
         if (!sessionId || !text.trim()) {
             console.warn("[Widget] Cannot send message: missing sessionId or empty text");
@@ -154,7 +263,13 @@ function WidgetChatContent() {
         }
 
         const trimmedText = text.trim();
+
+        const historyForApi = messages
+            .filter((m) => !m?.isError)
+            .map((m) => ({ role: m.role, content: m.content }));
+
         const userMessage = {
+            id: `u_${Date.now()}_${Math.random().toString(16).slice(2)}`,
             role: "user",
             content: trimmedText,
             timestamp: Date.now()
@@ -166,18 +281,37 @@ function WidgetChatContent() {
         setIsLoading(true);
         setError(null);
 
+        let assistantMessageId: string | null = null;
+
         try {
             console.log("[Widget] Sending message:", trimmedText);
+
+            assistantMessageId = `a_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+            // Placeholder assistant message for streaming
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: assistantMessageId,
+                    role: "assistant",
+                    content: "",
+                    timestamp: Date.now(),
+                    streaming: true,
+                },
+            ]);
 
             const res = await fetch("/api/widget/message", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
                 },
                 body: JSON.stringify({
                     session_id: sessionId,
                     sessionId: sessionId, // Support both formats
                     message: trimmedText,
+                    history: historyForApi,
+                    stream: true,
                 }),
             });
 
@@ -187,73 +321,83 @@ function WidgetChatContent() {
                 throw new Error(`Failed to send message: ${res.status}`);
             }
 
-            const data = await res.json();
-            console.log("[Widget] Message response:", data);
+            const contentType = res.headers.get("content-type") || "";
 
-            // Handle different response formats
-            let assistantMessage;
+            if (contentType.includes("text/event-stream") && res.body) {
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
 
-            if (data.role && data.content) {
-                // Format 1: { role: "assistant", content: "..." }
-                assistantMessage = {
-                    role: "assistant",
-                    content: data.content,
-                    timestamp: Date.now()
-                };
-            } else if (data.message) {
-                // Format 2: { message: "..." }
-                assistantMessage = {
-                    role: "assistant",
-                    content: data.message,
-                    timestamp: Date.now()
-                };
-            } else if (data.response) {
-                // Format 3: { response: "..." }
-                assistantMessage = {
-                    role: "assistant",
-                    content: data.response,
-                    timestamp: Date.now()
-                };
-            } else if (data.text) {
-                // Format 4: { text: "..." }
-                assistantMessage = {
-                    role: "assistant",
-                    content: data.text,
-                    timestamp: Date.now()
-                };
-            } else if (typeof data === "string") {
-                // Format 5: Just a string
-                assistantMessage = {
-                    role: "assistant",
-                    content: data,
-                    timestamp: Date.now()
-                };
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    let idx;
+                    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+                        const rawEvent = buffer.slice(0, idx);
+                        buffer = buffer.slice(idx + 2);
+
+                        const line = rawEvent.split("\n").find((l) => l.startsWith("data:"));
+                        if (!line) continue;
+
+                        const dataStr = line.slice("data:".length).trim();
+                        if (dataStr === "[DONE]") {
+                            setMessages((prev) => prev.map((m) => m.id === assistantMessageId ? ({ ...m, streaming: false }) : m));
+                            break;
+                        }
+
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            const delta = parsed?.content ?? "";
+
+                            if (delta) {
+                                setMessages((prev) => prev.map((m) =>
+                                    m.id === assistantMessageId
+                                        ? ({ ...m, content: (m.content || "") + String(delta) })
+                                        : m
+                                ));
+                            }
+                        } catch (e) {
+                            console.warn("[Widget] Failed to parse stream chunk:", dataStr);
+                        }
+                    }
+                }
+
+                // If the stream ended without [DONE]
+                setMessages((prev) => prev.map((m) => m.id === assistantMessageId ? ({ ...m, streaming: false }) : m));
             } else {
-                // Fallback: try to extract any string value
-                console.warn("[Widget] Unexpected response format:", data);
-                const content = data.data?.content
-                    || data.data?.message
-                    || data.reply
-                    || JSON.stringify(data);
+                const data = await res.json();
+                console.log("[Widget] Message response:", data);
 
-                assistantMessage = {
-                    role: "assistant",
-                    content,
-                    timestamp: Date.now()
-                };
+                const content =
+                    data?.content ||
+                    data?.message ||
+                    data?.response ||
+                    data?.text ||
+                    (typeof data === "string" ? data : JSON.stringify(data));
+
+                setMessages((prev) => prev.map((m) =>
+                    m.id === assistantMessageId
+                        ? ({ ...m, content: String(content || ""), streaming: false })
+                        : m
+                ));
             }
-
-            setMessages((prev) => [...prev, assistantMessage]);
         } catch (err) {
             console.error("[Widget] Send message error:", err);
 
             // Add error message to chat
-            setMessages((prev) => [...prev, {
-                role: "assistant",
-                content: "Sorry, I encountered an error. Please try again.",
-                timestamp: Date.now(),
-                isError: true
-            }]);
+            setMessages((prev) => [
+                ...prev.filter((m) => (assistantMessageId ? m.id !== assistantMessageId : true)),
+                {
+                    id: `e_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                    role: "assistant",
+                    content: "Sorry, I encountered an error. Please try again.",
+                    timestamp: Date.now(),
+                    isError: true
+                },
+            ]);
 
             setError(err instanceof Error ? err.message : "Failed to send message");
         } finally {
@@ -267,24 +411,28 @@ function WidgetChatContent() {
         || config?.primaryColor
         || config?.primary_color
         || config?.primary
-        || (config?.widget?.primary ? `#${config.widget.primary}` : null)
-        || (config?.primary ? `#${config.primary}` : null)
-        || "#6366f1";
+        || config?.widget?.primary
+
 
     const textColor = config?.widget?.textColor
         || config?.widget?.text_color
         || config?.textColor
         || config?.text_color
         || config?.text
-        || (config?.widget?.text ? `#${config.widget.text}` : null)
-        || (config?.text ? `#${config.text}` : null)
+        || config?.widget?.text
         || "#ffffff";
 
     const theme = config?.widget?.theme || config?.theme || "light";
     const botName = config?.widget?.title || config?.widget?.name || config?.title || config?.name || "Chat Pilot";
 
+    const primaryCss = toCssColor(primaryColor, "");
+    const textCss = toCssColor(textColor, "#ffffff");
+
+    const botTone = config?.bot?.tone ?? config?.tone ?? null;
+    const toneSuggestions = getToneSuggestions(botTone, botName);
+
     // Log colors for debugging
-    console.log("[Widget] Colors configured:", { primaryColor, textColor, theme, botName });
+    console.log("[Widget] Colors configured:", { primaryCss, textCss, theme, botName, botTone });
 
     // Error state
     if (error && !config) {
@@ -354,7 +502,7 @@ function WidgetChatContent() {
                     width: "40px",
                     height: "40px",
                     border: "4px solid #e2e8f0",
-                    borderTopColor: "#6366f1",
+                    borderTopColor: "#",
                     borderRadius: "50%",
                 }} className="animate-spin"></div>
                 <div style={{ fontSize: "14px", fontWeight: "500" }}>Loading chat...</div>
@@ -380,7 +528,7 @@ function WidgetChatContent() {
                 justifyContent: "space-between",
                 alignItems: "center",
                 borderBottom: theme === "dark" ? "1px solid #1e293b" : "1px solid #f1f5f9",
-                borderTop: `4px solid ${primaryColor}`,
+                borderTop: `4px solid ${primaryCss}`,
                 flexShrink: 0,
                 backgroundColor: theme === "dark" ? "#0f172a" : "#ffffff",
             },
@@ -469,8 +617,8 @@ function WidgetChatContent() {
                 fontSize: "14px",
                 fontWeight: 500,
                 maxWidth: "80%",
-                backgroundColor: primaryColor,
-                color: textColor,
+                backgroundColor: primaryCss,
+                color: textCss,
                 boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                 letterSpacing: "-0.01em",
                 wordWrap: "break-word" as const,
@@ -546,7 +694,7 @@ function WidgetChatContent() {
                 gap: "6px",
             },
             brandingBadge: {
-                backgroundColor: "#94a3b8",
+                backgroundColor: "#ffffff",
                 color: "#ffffff",
                 fontSize: "9px",
                 fontWeight: 800,
@@ -577,8 +725,8 @@ function WidgetChatContent() {
                 transition: "border-color 0.2s, box-shadow 0.2s",
             },
             inputWrapperFocused: {
-                borderColor: primaryColor,
-                boxShadow: `0 0 0 3px ${primaryColor}15`,
+                borderColor: primaryCss,
+                boxShadow: `0 0 0 3px ${primaryCss}15`,
             },
             input: {
                 backgroundColor: "transparent",
@@ -599,7 +747,7 @@ function WidgetChatContent() {
                 alignItems: "center",
                 justifyContent: "center",
                 color: "#ffffff",
-                backgroundColor: inputValue.trim() ? primaryColor : "#cbd5e1",
+                backgroundColor: inputValue.trim() ? primaryCss : "#cbd5e1",
                 border: "none",
                 cursor: inputValue.trim() && !isLoading ? "pointer" : "not-allowed",
                 transition: "all 0.2s",
@@ -662,6 +810,45 @@ function WidgetChatContent() {
 
                 {/* Footer */}
                 <div style={embeddedStyles.footer}>
+                    {/* Suggestions */}
+                    {!isLoading && toneSuggestions?.length > 0 && messages.length <= 1 && (
+                        <div style={{
+                            display: "flex",
+                            gap: "8px",
+                            overflowX: "auto",
+                            padding: "0 2px 10px",
+                            WebkitOverflowScrolling: "touch",
+                        }}>
+                            {toneSuggestions.map((s: string, idx: number) => (
+                                <button
+                                    key={`${idx}-${s}`}
+                                    onClick={() => sendMessage(s)}
+                                    style={{
+                                        padding: "8px 10px",
+                                        borderRadius: "999px",
+                                        border: theme === "dark" ? "1px solid #334155" : "1px solid #e2e8f0",
+                                        backgroundColor: theme === "dark" ? "#0b1220" : "#ffffff",
+                                        color: theme === "dark" ? "#e2e8f0" : "#0f172a",
+                                        fontSize: "12px",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        whiteSpace: "nowrap",
+                                        transition: "transform 0.15s, border-color 0.15s",
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.borderColor = primaryCss;
+                                        e.currentTarget.style.transform = "translateY(-1px)";
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.borderColor = theme === "dark" ? "#334155" : "#e2e8f0";
+                                        e.currentTarget.style.transform = "translateY(0)";
+                                    }}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div
                         style={{
                             ...embeddedStyles.inputWrapper,
@@ -764,7 +951,7 @@ export default function WidgetChat() {
                     width: "40px",
                     height: "40px",
                     border: "4px solid #e2e8f0",
-                    borderTopColor: "#6366f1",
+                    borderTopColor: "#",
                     borderRadius: "50%",
                     animation: "spin 1s linear infinite",
                 }}></div>

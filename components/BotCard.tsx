@@ -4,7 +4,10 @@ import { supabase } from "@/services/supabase";
 import { TEMPLATES } from "@/lib/constants";
 import { Settings, Power } from "lucide-react";
 
-const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
+const BotCard: React.FC<{
+  bot: BotWithRelations;
+  stats?: { totalMessages: number; connectors: string[] };
+}> = ({ bot, stats }) => {
   const [isActive, setIsActive] = useState(bot.bot_settings?.active ?? false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
@@ -192,6 +195,20 @@ const BotCard: React.FC<{ bot: BotWithRelations }> = ({ bot }) => {
         <p className="text-sm text-slate-500 mt-1 flex-grow">
           {bot.system_prompt ?? 'No system prompt configured yet.'}
         </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700">
+            Total messages: {stats?.totalMessages ?? 0}
+          </span>
+          {(stats?.connectors ?? []).map((label) => (
+            <span
+              key={label}
+              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-800"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
 
         {!isFullyConfigured && (
           <div className="mt-4 border border-amber-200 bg-amber-50 p-3 rounded-lg text-xs">

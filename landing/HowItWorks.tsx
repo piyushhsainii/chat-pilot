@@ -1,216 +1,473 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "framer-motion";
+import {
+  BarChart3,
+  Database,
+  Fingerprint,
+  Link as LinkIcon,
+  ShieldCheck,
+} from "lucide-react";
 
-const steps = [
+type HowStep = {
+  id: string;
+  number: string;
+  title: string;
+  desc: string;
+  mediaSrc?: string;
+  theme: {
+    // Background wash for the right panel.
+    bg: string;
+    // Accent color used for highlights.
+    accent: string;
+    // Soft card tint.
+    card: string;
+  };
+  icon: React.ReactNode;
+};
+
+const DEFAULT_STEPS: HowStep[] = [
   {
-    id: 1,
-    title: "Build & deploy your agent",
-    desc: "Upload docs, sync your help center, or point to your URL. Deploy in minutes.",
-    img: "https://picsum.photos/seed/step1/1200/900",
+    id: "deploy-bot",
+    number: "01",
+    title: "Setup & Deploy the Bot",
+    desc:
+      "Launch the setup bot, answer a few prompts, and it generates your configuration instantly. No manual setup—go from zero to ready-to-install in minutes.",
+    mediaSrc: "/step1.png",
+    theme: {
+      bg: "bg-[radial-gradient(900px_circle_at_30%_20%,rgba(167,243,208,0.55),transparent_55%),radial-gradient(900px_circle_at_80%_80%,rgba(186,230,253,0.55),transparent_55%)]",
+      accent: "#10b981",
+      card: "bg-emerald-50 border-emerald-200",
+    },
+    icon: <Fingerprint className="h-5 w-5" />,
   },
   {
-    id: 2,
-    title: "Agent solves your customers' problems",
-    desc: "Your agent uses real-time context to provide accurate answers instantly.",
-    img: "https://picsum.photos/seed/step2/1200/900",
+    id: "connect-tools",
+    number: "02",
+    title: "Connect Multiple Tools",
+    desc:
+      "Link your favorite tools (CRM, email, analytics, ads, Slack, etc.). The bot auto-detects what you already use and guides you through secure one-click connections.",
+    mediaSrc: "/step2.png",
+    theme: {
+      bg: "bg-[radial-gradient(900px_circle_at_25%_20%,rgba(253,224,71,0.50),transparent_55%),radial-gradient(900px_circle_at_85%_70%,rgba(251,207,232,0.55),transparent_55%)]",
+      accent: "#eab308",
+      card: "bg-amber-50 border-amber-amber-200",
+    },
+    icon: <ShieldCheck className="h-5 w-5" />,
   },
   {
-    id: 3,
-    title: "Refine & optimize",
-    desc: "Use human-in-the-loop to teach your agent and improve response quality.",
-    img: "https://picsum.photos/seed/step3/1200/900",
+    id: "embed-website",
+    number: "03",
+    title: "Embed on Your Website",
+    desc:
+      "Copy a single snippet (or use a 1-click install) to add the bot to your site. The bot verifies it’s live and working in real time—no developer required.",
+    mediaSrc: "/step3.png",
+    theme: {
+      bg: "bg-[radial-gradient(900px_circle_at_25%_15%,rgba(191,219,254,0.65),transparent_55%),radial-gradient(900px_circle_at_90%_85%,rgba(199,210,254,0.60),transparent_55%)]",
+      accent: "#3b82f6",
+      card: "bg-sky-50 border-sky-200",
+    },
+    icon: <Database className="h-5 w-5" />,
   },
   {
-    id: 4,
-    title: "Route complex issues to a human",
-    desc: "Smart escalation automatically hands off complex tickets to your support team.",
-    img: "https://picsum.photos/seed/step4/1200/900",
+    id: "automate",
+    number: "04",
+    title: "Track Analytics That Drive Growth",
+    desc:
+      "See leads, bookings, revenue, and ROAS in one dashboard. Track what converts, prove ROI, and double down on the workflows and channels that generate real results.",
+    theme: {
+      bg: "bg-[radial-gradient(900px_circle_at_30%_20%,rgba(251,191,36,0.25),transparent_55%),radial-gradient(900px_circle_at_80%_75%,rgba(147,197,253,0.55),transparent_55%)]",
+      accent: "#111827",
+      card: "bg-zinc-50 border-zinc-200",
+    },
+    mediaSrc: "/step4.png",
+    icon: <BarChart3 className="h-5 w-5" />,
   },
-  {
-    id: 5,
-    title: "Review analytics & insights",
-    desc: "Deep visibility into agent performance and customer satisfaction trends.",
-    img: "https://picsum.photos/seed/step5/1200/900",
-  },
+
 ];
 
-type Step = (typeof steps)[number];
 
-const StepCard: React.FC<{
-  step: Step;
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function usePrefersReducedMotionValue() {
+  const reduced = useReducedMotion();
+  return Boolean(reduced);
+}
+
+const StepItem: React.FC<{
+  step: HowStep;
   idx: number;
-  activeStep: number;
+  isActive: boolean;
   shouldReduceMotion: boolean;
-  onActivateFromScroll: (idx: number) => void;
+  onActivate: (idx: number) => void;
   onSelect: (idx: number) => void;
   registerRef: (idx: number, node: HTMLDivElement | null) => void;
 }> = ({
   step,
   idx,
-  activeStep,
+  isActive,
   shouldReduceMotion,
-  onActivateFromScroll,
+  onActivate,
   onSelect,
   registerRef,
 }) => {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const isActive = activeStep === idx;
-  const isInView = useInView(ref, {
-    amount: 0.55,
-    margin: "-45% 0px -45% 0px",
-  });
+    const ref = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!isInView) return;
-    onActivateFromScroll(idx);
-  }, [idx, isInView, onActivateFromScroll]);
+    const inView = useInView(ref, {
+      amount: 0,
+      // Treat "center line" as the activation trigger.
+      margin: "-50% 0px -50% 0px",
+    });
 
-  const number = String(step.id).padStart(2, "0");
+    useEffect(() => {
+      if (!inView) return;
+      onActivate(idx);
+    }, [idx, inView, onActivate]);
 
-  return (
-    <motion.div
-      ref={(node) => {
-        ref.current = node;
-        registerRef(idx, node);
-      }}
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
-      whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.35 }}
-      transition={{ duration: 0.55, ease: "easeOut" }}
-      className="relative"
-    >
-      <motion.button
-        type="button"
-        layout
-        transition={
-          shouldReduceMotion
-            ? { duration: 0 }
-            : { type: "spring", stiffness: 520, damping: 44 }
-        }
-        onClick={() => onSelect(idx)}
-        className={
-          "group relative w-full text-left rounded-2xl px-5 py-4 border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/20 " +
-          (isActive
-            ? "bg-white border-zinc-200 shadow-[0_18px_60px_-45px_rgba(0,0,0,0.55)]"
-            : "bg-transparent border-transparent hover:bg-white hover:border-zinc-200")
-        }
-        aria-current={isActive ? "step" : undefined}
+    return (
+      <div
+        ref={(node) => {
+          ref.current = node;
+          registerRef(idx, node);
+        }}
+        className="relative"
       >
-        {isActive ? (
-          <motion.div
-            layoutId="howItWorksActive"
-            transition={{ type: "spring", stiffness: 520, damping: 44 }}
-            className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_35%_0%,rgba(24,24,27,0.08),transparent_58%)]"
-          />
-        ) : null}
-
-        <div
+        <motion.button
+          type="button"
+          onClick={() => onSelect(idx)}
+          aria-current={isActive ? "step" : undefined}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
+          whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
           className={
-            "relative grid grid-cols-[3.25rem_1fr] gap-4 items-start transition-opacity " +
-            (isActive ? "opacity-100" : "opacity-55 group-hover:opacity-80")
+            "group w-full rounded-3xl border px-6 py-5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/15 " +
+            (isActive
+              ? "bg-white border-zinc-200 shadow-[0_18px_70px_-55px_rgba(0,0,0,0.55)]"
+              : "bg-white/40 border-transparent hover:bg-white hover:border-zinc-200")
           }
         >
-          <div className="relative pt-0.5">
-            <div className="absolute left-0 top-2 h-5 w-5 rounded-full bg-white border border-zinc-200" />
-            <motion.div
-              className={
-                "absolute left-0 top-2 h-5 w-5 rounded-full border " +
-                (isActive ? "bg-zinc-950 border-zinc-950" : "bg-white border-zinc-300")
-              }
-              animate={
-                shouldReduceMotion
-                  ? undefined
-                  : { scale: isActive ? 1 : 0.9, opacity: isActive ? 1 : 0.65 }
-              }
-              transition={{ type: "spring", stiffness: 420, damping: 34 }}
-            />
-
-            <div
-              className={
-                "pl-7 text-sm font-semibold tabular-nums transition-colors " +
-                (isActive ? "text-zinc-900" : "text-zinc-400")
-              }
-            >
-              {number}
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <div
-              className={
-                "text-lg md:text-xl font-semibold tracking-tight transition-colors " +
-                (isActive ? "text-zinc-950" : "text-zinc-500")
-              }
-            >
-              {step.title}
+          <div className="flex items-start gap-4">
+            <div className="pt-0.5">
+              <div
+                className={
+                  "h-9 w-9 rounded-2xl border flex items-center justify-center shadow-sm transition-colors " +
+                  (isActive
+                    ? "bg-zinc-950 border-zinc-950 text-white"
+                    : "bg-white border-zinc-200 text-zinc-700")
+                }
+              >
+                {step.icon}
+              </div>
             </div>
 
-            <motion.div
-              initial={false}
-              animate={
-                shouldReduceMotion
-                  ? { opacity: isActive ? 1 : 0 }
-                  : {
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-3">
+                <div
+                  className={
+                    "text-xs font-black tracking-[0.18em] tabular-nums " +
+                    (isActive ? "text-zinc-900" : "text-zinc-400")
+                  }
+                >
+                  {step.number}
+                </div>
+                <div
+                  className={
+                    "text-lg md:text-xl font-semibold tracking-tight " +
+                    (isActive ? "text-zinc-950" : "text-zinc-500")
+                  }
+                >
+                  {step.title}
+                </div>
+              </div>
+
+              <motion.p
+                initial={false}
+                animate={
+                  shouldReduceMotion
+                    ? { opacity: isActive ? 1 : 0 }
+                    : {
                       opacity: isActive ? 1 : 0,
                       height: isActive ? "auto" : 0,
-                      marginTop: isActive ? 8 : 0,
-                      scale: isActive ? 1 : 0.985,
+                      marginTop: isActive ? 10 : 0,
                     }
-              }
-              transition={
-                shouldReduceMotion
-                  ? { duration: 0 }
-                  : { duration: 0.35, ease: "easeOut" }
-              }
-              style={{ overflow: "hidden" }}
-              className="origin-top"
-            >
-              <p className="text-sm text-zinc-600 leading-relaxed max-w-[46ch]">
+                }
+                transition={
+                  shouldReduceMotion
+                    ? { duration: 0 }
+                    : { duration: 0.35, ease: "easeOut" }
+                }
+                className="overflow-hidden text-sm text-zinc-600 leading-relaxed max-w-[54ch]"
+              >
                 {step.desc}
-              </p>
-            </motion.div>
+              </motion.p>
+            </div>
+          </div>
+        </motion.button>
+      </div>
+    );
+  };
+
+const ConnectorViz: React.FC<{
+  activeIdx: number;
+  accent: string;
+  shouldReduceMotion: boolean;
+}> = ({ activeIdx, accent, shouldReduceMotion }) => {
+  const nodes = useMemo(
+    () => [
+      {
+        label: "Meta",
+        style: "bg-white border-zinc-200",
+        icon: (
+          <div className="h-9 w-9 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 font-black">
+            m
+          </div>
+        ),
+        pos: { x: 14, y: 54 },
+      },
+      {
+        label: "Google",
+        style: "bg-white border-zinc-200",
+        icon: (
+          <div className="h-9 w-9 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 font-black">
+            g
+          </div>
+        ),
+        pos: { x: 74, y: 34 },
+      },
+      {
+        label: "Ads",
+        style: "bg-white border-zinc-200",
+        icon: (
+          <div className="h-9 w-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-black">
+            a
+          </div>
+        ),
+        pos: { x: 80, y: 70 },
+      },
+      {
+        label: "Site",
+        style: "bg-white border-zinc-200",
+        icon: (
+          <div className="h-9 w-9 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 font-black">
+            w
+          </div>
+        ),
+        pos: { x: 28, y: 24 },
+      },
+    ],
+    [],
+  );
+
+  const hub = { x: 48, y: 52 };
+  const activeNode = nodes[clamp(activeIdx, 0, nodes.length - 1)];
+
+  const pathFor = (from: { x: number; y: number }) => {
+    const midX = (from.x + hub.x) / 2;
+    const midY = (from.y + hub.y) / 2;
+    const c1 = { x: midX, y: from.y };
+    const c2 = { x: midX, y: hub.y };
+    return `M ${from.x} ${from.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${hub.x} ${hub.y}`;
+  };
+
+  return (
+    <div className="relative h-[360px] sm:h-[420px]">
+      <svg
+        viewBox="0 0 100 100"
+        className="absolute inset-0 h-full w-full"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        {nodes.map((n) => {
+          const d = pathFor(n.pos);
+          const isActive = n.label === activeNode.label;
+
+          return (
+            <g key={n.label}>
+              <path
+                d={d}
+                stroke="rgba(148,163,184,0.55)"
+                strokeWidth={0.9}
+                strokeLinecap="round"
+              />
+
+              {!shouldReduceMotion ? (
+                <motion.path
+                  d={d}
+                  stroke={isActive ? accent : "rgba(148,163,184,0.35)"}
+                  strokeWidth={isActive ? 1.7 : 1.1}
+                  strokeLinecap="round"
+                  strokeDasharray={"3 10"}
+                  animate={{ strokeDashoffset: [0, -80] }}
+                  transition={{
+                    duration: isActive ? 1.35 : 2.2,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  opacity={isActive ? 0.95 : 0.55}
+                />
+              ) : null}
+            </g>
+          );
+        })}
+
+        <circle
+          cx={hub.x}
+          cy={hub.y}
+          r={12.5}
+          fill="rgba(255,255,255,0.9)"
+          stroke="rgba(226,232,240,1)"
+        />
+        {!shouldReduceMotion ? (
+          <motion.circle
+            cx={hub.x}
+            cy={hub.y}
+            r={18.5}
+            fill="none"
+            stroke={accent}
+            strokeWidth={0.8}
+            animate={{ opacity: [0.12, 0.35, 0.12], r: [17, 19, 17] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+        ) : null}
+      </svg>
+
+      {nodes.map((n) => {
+        const isActive = n.label === activeNode.label;
+        return (
+          <div
+            key={n.label}
+            className={
+              "absolute -translate-x-1/2 -translate-y-1/2 rounded-2xl border px-3 py-2 shadow-sm backdrop-blur-sm transition " +
+              (isActive
+                ? "bg-white/90 border-slate-200 shadow-[0_16px_40px_-26px_rgba(0,0,0,0.45)]"
+                : "bg-white/75 border-white/40")
+            }
+            style={{ left: `${n.pos.x}%`, top: `${n.pos.y}%` }}
+          >
+            <div className="flex items-center gap-2">
+              {n.icon}
+              <div className="text-xs font-bold text-zinc-800 whitespace-nowrap">
+                {n.label}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      <div
+        className="absolute -translate-x-1/2 -translate-y-1/2"
+        style={{ left: `${hub.x}%`, top: `${hub.y}%` }}
+      >
+        <div className="h-[78px] w-[78px] rounded-[22px] bg-white/90 border border-white/60 shadow-[0_20px_55px_-34px_rgba(0,0,0,0.65)] flex items-center justify-center">
+          <div className="h-[58px] w-[58px] rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.65),rgba(255,255,255,0.15))] border border-white/70 flex items-center justify-center">
+            <LinkIcon className="h-6 w-6" style={{ color: accent }} />
           </div>
         </div>
-
-        {idx < steps.length - 1 ? (
-          <div className="pointer-events-none absolute left-5 right-5 bottom-0 h-px bg-zinc-200/70" />
-        ) : null}
-      </motion.button>
-    </motion.div>
+      </div>
+    </div>
   );
 };
 
-const HowItWorks: React.FC = () => {
+const VisualPanel: React.FC<{
+  step: HowStep;
+  activeIdx: number;
+  shouldReduceMotion: boolean;
+}> = ({ step, activeIdx, shouldReduceMotion }) => {
+  return (
+    <div
+      className={
+        "rounded-[2.25rem] border border-zinc-200 bg-white/80 p-3 shadow-[0_40px_120px_-85px_rgba(0,0,0,0.45)]" +
+        " backdrop-blur-sm"
+      }
+    >
+      <div
+        className={
+          "relative overflow-hidden rounded-[1.85rem] border border-zinc-200 bg-white " +
+          step.theme.bg
+        }
+      >
+        <div className="pointer-events-none absolute inset-0 opacity-[0.85]" />
+
+        <div className="relative px-6 pt-6 pb-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div
+                className={
+                  "h-11 w-11 rounded-2xl border shadow-sm flex items-center justify-center " +
+                  step.theme.card
+                }
+                style={{ color: step.theme.accent }}
+              >
+                {step.icon}
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-600">
+                  Step {step.number}
+                </div>
+                <div className="text-base font-bold tracking-tight text-zinc-950">
+                  {step.title}
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="rounded-full border border-white/40 bg-white/60 px-3 py-1 text-[11px] font-semibold text-zinc-700">
+                Live preview
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={step.id}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+              >
+                <img src={step.mediaSrc} className="max-h-96 mx-auto" alt="" />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HowItWorks: React.FC<{ steps?: HowStep[] }> = ({ steps = DEFAULT_STEPS }) => {
+  const shouldReduceMotion = usePrefersReducedMotionValue();
   const [activeStep, setActiveStep] = useState(0);
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const shouldReduceMotion = useReducedMotion();
   const stepRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  const active = useMemo(() => steps[activeStep], [activeStep]);
+  const active = useMemo(() => steps[clamp(activeStep, 0, steps.length - 1)], [steps, activeStep]);
 
-  const registerRef = useCallback((idx: number, node: HTMLDivElement | null) => {
+  const registerStepRef = useCallback((idx: number, node: HTMLDivElement | null) => {
     stepRefs.current[idx] = node;
-  }, []);
-
-  const scrollToStep = useCallback((idx: number) => {
-    const el = stepRefs.current[idx];
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
 
   const setActiveFromScroll = useCallback((idx: number) => {
     setActiveStep((prev) => (prev === idx ? prev : idx));
   }, []);
 
+  const scrollTo = useCallback((idx: number) => {
+    const el = stepRefs.current[idx];
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
   return (
     <section
-      ref={sectionRef}
       id="how"
       className="relative py-20 md:py-28 bg-zinc-50 border-y border-zinc-200 overflow-hidden"
     >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-28 left-1/2 h-[520px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.08),transparent_60%)]" />
-        <div className="absolute -bottom-40 right-[-240px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.06),transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute -top-28 left-1/2 h-[520px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.07),transparent_60%)]" />
+        <div className="absolute -bottom-40 right-[-240px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.05),transparent_60%)]" />
       </div>
 
       <div className="relative max-w-6xl mx-auto px-4 md:px-8">
@@ -219,28 +476,20 @@ const HowItWorks: React.FC = () => {
             How it works
           </p>
           <h2 className="mt-3 text-3xl md:text-4xl font-semibold tracking-tight text-zinc-950">
-            From docs to deployed agent in minutes
+            A scroll-guided workflow that stays clear
           </h2>
           <p className="mt-4 text-base text-zinc-600 leading-relaxed">
-            A guided workflow that keeps setup simple and results predictable.
+            Scroll to explore. The preview stays put while the steps advance.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div
-            className="relative"
-            onKeyDown={(e) => {
-              if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-              e.preventDefault();
-              const dir = e.key === "ArrowDown" ? 1 : -1;
-              const next = (activeStep + dir + steps.length) % steps.length;
-              scrollToStep(next);
-            }}
-          >
-            <div className="absolute left-5 top-1 bottom-1 w-px bg-zinc-200" />
-
+        <div className="mt-12 grid gap-10 lg:grid-cols-12 lg:items-start">
+          {/* Steps (left) */}
+          <div className="relative lg:col-span-5">
+            <div className="absolute left-3 top-3 bottom-3 w-px bg-zinc-200" aria-hidden="true" />
             <motion.div
-              className="absolute left-5 top-1 w-px origin-top bg-zinc-950/30"
+              className="absolute left-3 top-3 w-px origin-top bg-zinc-950/35"
+              aria-hidden="true"
               animate={{
                 height:
                   steps.length <= 1
@@ -250,56 +499,46 @@ const HowItWorks: React.FC = () => {
               transition={
                 shouldReduceMotion
                   ? { duration: 0 }
-                  : { type: "spring", stiffness: 320, damping: 36 }
+                  : { type: "spring", stiffness: 300, damping: 34 }
               }
             />
 
-            <div className="space-y-6 lg:space-y-10">
-              {steps.map((step, idx) => (
-                <StepCard
-                  key={step.id}
-                  step={step}
-                  idx={idx}
-                  activeStep={activeStep}
-                  shouldReduceMotion={!!shouldReduceMotion}
-                  onActivateFromScroll={setActiveFromScroll}
-                  onSelect={scrollToStep}
-                  registerRef={registerRef}
-                />
+            <div className="space-y-6">
+              {steps.map((s, idx) => (
+                <div key={s.id} className="relative pl-6">
+                  <div
+                    className={
+                      "absolute left-0 top-7 h-3.5 w-3.5 rounded-full border bg-white transition-colors " +
+                      (idx === activeStep
+                        ? "border-zinc-950"
+                        : "border-zinc-300")
+                    }
+                    aria-hidden="true"
+                  />
+
+                  <StepItem
+                    step={s}
+                    idx={idx}
+                    isActive={idx === activeStep}
+                    shouldReduceMotion={shouldReduceMotion}
+                    onActivate={setActiveFromScroll}
+                    onSelect={scrollTo}
+                    registerRef={registerStepRef}
+                  />
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-zinc-200 bg-white p-2 shadow-[0_24px_80px_-60px_rgba(0,0,0,0.45)] lg:sticky lg:top-1/2 lg:-translate-y-1/2">
-            <motion.div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-950">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.img
-                  key={activeStep}
-                  src={active.img}
-                  alt={active.title}
-                  initial={shouldReduceMotion ? false : { opacity: 0, scale: 1.02, y: 8 }}
-                  animate={{ opacity: 0.92, scale: 1, y: 0 }}
-                  exit={shouldReduceMotion ? undefined : { opacity: 0, scale: 0.995, y: -6 }}
-                  transition={{ duration: 0.55, ease: "easeOut" }}
-                  className="absolute inset-0 h-full w-full object-cover saturate-0 contrast-110"
-                />
-              </AnimatePresence>
-
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-zinc-950/20 to-transparent" />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.08),transparent_45%)]" />
-
-              <div className="absolute left-4 right-4 bottom-4 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4">
-                <div className="text-xs font-semibold tracking-[0.18em] uppercase text-zinc-200/80">
-                  Step {String(active.id).padStart(2, "0")}
-                </div>
-                <div className="mt-1 text-base font-semibold text-white leading-snug">
-                  {active.title}
-                </div>
-                <div className="mt-2 text-sm text-zinc-200/80 leading-relaxed">
-                  {active.desc}
-                </div>
-              </div>
-            </motion.div>
+          {/* Visual (right) */}
+          <div className="lg:col-span-7">
+            <div className="lg:sticky lg:top-24">
+              <VisualPanel
+                step={active}
+                activeIdx={activeStep}
+                shouldReduceMotion={shouldReduceMotion}
+              />
+            </div>
           </div>
         </div>
       </div>

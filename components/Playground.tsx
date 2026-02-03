@@ -156,6 +156,7 @@ export const Playground = ({
         botId: bot.id,
         query,
         history: currentMessages.slice(-12),
+        testMode: true,
       }),
       signal,
     });

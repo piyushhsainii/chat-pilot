@@ -34,10 +34,10 @@ const testimonials = [
 
 const Testimonials: React.FC = () => {
   return (
-    <section className="py-20 md:py-28 bg-zinc-50">
+    <section className="py-20 md:py-28 bg-zinc-50 text-black">
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="max-w-3xl mx-auto text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black">
             Testimonials
           </p>
           <h2 className="mt-3 text-3xl md:text-4xl font-semibold tracking-tight text-zinc-950">
@@ -49,7 +49,7 @@ const Testimonials: React.FC = () => {
           </p>
         </div>
 
-        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4 text-black">
           {testimonials.map((t) => (
             <figure
               key={t.author}

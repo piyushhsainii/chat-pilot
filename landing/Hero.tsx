@@ -37,9 +37,11 @@ const Hero: React.FC = () => {
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
             href="/dashboard"
-            className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3.5 rounded-full bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800 transition"
+            className="w-full sm:w-auto  inline-flex items-center justify-center px-7 py-3.5 rounded-full bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800 transition"
           >
-            Build your agent
+            <button className="border border-black">
+              Build your agent
+            </button>
           </Link>
           <Link
             href="/login"
@@ -56,9 +58,11 @@ const Hero: React.FC = () => {
         <div className="mt-14 md:mt-20">
           <div className="relative max-w-5xl mx-auto rounded-3xl border border-zinc-900/10 bg-white/80 p-2 shadow-[0_40px_120px_-60px_rgba(24,24,27,0.25)]">
             <div className="relative rounded-2xl overflow-hidden bg-white border border-zinc-900/10">
-              <img
-                src="https://picsum.photos/seed/dashboard/1400/820"
-                alt="Dashboard preview"
+              <video
+                src="/chat-pilot-initial-walkthrough.mp4"
+                controls
+                muted
+                autoPlay
                 className="w-full h-auto opacity-95 contrast-110"
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white/50 via-transparent to-transparent" />

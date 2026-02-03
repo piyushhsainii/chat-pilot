@@ -46,6 +46,7 @@ const KnowledgeManager: React.FC<{
   const [dragging, setDragging] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isIndexing, setIsIndexing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -109,19 +110,57 @@ const KnowledgeManager: React.FC<{
 
       const existingId = (existing as any[])?.[0]?.id as string | undefined;
       if (existingId) {
-        const { error: updateError } = await supabase
+        const { data: updated, error: updateError } = await supabase
           .from("knowledge_sources" as any)
           .update({ doc_url: [publicUrl], status: "processing", type } as any)
+          .select("id")
           .eq("id", existingId);
         if (updateError) throw updateError;
-        return;
+        return ((updated as any[])?.[0]?.id as string) ?? existingId;
       }
 
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("knowledge_sources" as any)
-        .insert({ bot_id: botId, name, type, doc_url: [publicUrl] } as any);
+        .insert({ bot_id: botId, name, type, doc_url: [publicUrl] } as any)
+        .select("id")
+        .single();
 
       if (insertError) throw insertError;
+      return (inserted as any)?.id as string;
+    },
+    [],
+  );
+
+  const ingestKnowledgeSource = useCallback(
+    async ({
+      botId,
+      sourceId,
+      sourceName,
+      type,
+      publicUrl,
+    }: {
+      botId: string;
+      sourceId: string;
+      sourceName: string;
+      type: "pdf" | "text";
+      publicUrl: string;
+    }) => {
+      const res = await fetch("/api/knowledge/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          botId,
+          sourceId,
+          sourceName,
+          type,
+          publicUrl,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? "Failed to index document");
+      }
     },
     [],
   );
@@ -181,9 +220,11 @@ const KnowledgeManager: React.FC<{
   async function uploadFiles(fileList: FileList) {
     if (!basePath) return;
     if (!selectedBotId) return;
+    setIsIndexing(true);
     for (const file of Array.from(fileList)) {
       if (plan === "free" && usedBytes + file.size > MAX_FREE_BYTES) {
         alert("Free plan limit reached (25MB)");
+        setIsIndexing(false);
         return;
       }
 
@@ -195,6 +236,7 @@ const KnowledgeManager: React.FC<{
 
       if (error) {
         alert(error.message);
+        setIsIndexing(false);
         return;
       }
 
@@ -204,24 +246,38 @@ const KnowledgeManager: React.FC<{
       const publicUrl = publicData?.publicUrl;
       if (!publicUrl) {
         alert("Failed to generate public URL for uploaded file");
+        setIsIndexing(false);
         return;
       }
 
       try {
-        await upsertKnowledgeSource({
+        const type = getSourceTypeFromName(file.name);
+        const sourceId = await upsertKnowledgeSource({
           botId: selectedBotId,
           name: file.name,
-          type: getSourceTypeFromName(file.name),
+          type,
           publicUrl,
         });
+
+        if (sourceId) {
+          await ingestKnowledgeSource({
+            botId: selectedBotId,
+            sourceId,
+            sourceName: file.name,
+            type,
+            publicUrl,
+          });
+        }
       } catch (e: any) {
         console.error(e);
         alert(e?.message ?? "Failed to save knowledge source");
+        setIsIndexing(false);
         return;
       }
     }
     loadFiles(basePath);
     loadKnowledgeSources(selectedBotId);
+    setIsIndexing(false);
   }
 
   /* ---------------------------------------------
@@ -234,6 +290,7 @@ const KnowledgeManager: React.FC<{
     }
 
     setIsSaving(true);
+    setIsIndexing(true);
     try {
       if (!basePath) return;
       if (!selectedBotId) return;
@@ -245,6 +302,7 @@ const KnowledgeManager: React.FC<{
       if (plan === "free" && usedBytes + file.size > MAX_FREE_BYTES) {
         alert("Free plan limit reached (25MB)");
         setIsSaving(false);
+        setIsIndexing(false);
         return;
       }
 
@@ -262,15 +320,26 @@ const KnowledgeManager: React.FC<{
         const publicUrl = publicData?.publicUrl;
         if (!publicUrl) {
           alert("Failed to generate public URL for saved text");
+          setIsIndexing(false);
           return;
         }
 
-        await upsertKnowledgeSource({
+        const sourceId = await upsertKnowledgeSource({
           botId: selectedBotId,
           name: fileName,
           type: "text",
           publicUrl,
         });
+
+        if (sourceId) {
+          await ingestKnowledgeSource({
+            botId: selectedBotId,
+            sourceId,
+            sourceName: fileName,
+            type: "text",
+            publicUrl,
+          });
+        }
 
         setTextInput("");
         loadFiles(basePath);
@@ -282,6 +351,7 @@ const KnowledgeManager: React.FC<{
       alert(error?.message ?? "Failed to save text");
     } finally {
       setIsSaving(false);
+      setIsIndexing(false);
     }
   }
 
@@ -384,15 +454,19 @@ const KnowledgeManager: React.FC<{
           {/* Upload */}
           {activeTab === "upload" && (
             <>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition
+               <div
+                 onClick={() => {
+                   if (isIndexing) return;
+                   fileInputRef.current?.click();
+                 }}
+                 onDragOver={(e) => {
+                   e.preventDefault();
+                   if (isIndexing) return;
+                   setDragging(true);
+                 }}
+                 onDragLeave={() => setDragging(false)}
+                 onDrop={handleDrop}
+                 className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition
                   ${
                     dragging
                       ? "border-indigo-500 bg-indigo-50"
@@ -401,16 +475,17 @@ const KnowledgeManager: React.FC<{
               >
                 <div className="text-4xl mb-4">📄</div>
                 <h4 className="font-bold text-lg">Click or drag files here</h4>
-                <p className="text-slate-500 mt-1">
-                  PDFs, DOCX, TXT — Max 25MB (Free)
-                </p>
+                 <p className="text-slate-500 mt-1">
+                   PDFs, TXT — Max 25MB (Free)
+                 </p>
 
                   <input
                     ref={fileInputRef}
                     type="file"
                     multiple
-                    accept=".pdf,.txt,.docx"
+                    accept=".pdf,.txt"
                     className="hidden"
+                    disabled={isIndexing}
                     onChange={(e) =>
                       e.target.files && uploadFiles(e.target.files)
                     }
@@ -437,15 +512,15 @@ const KnowledgeManager: React.FC<{
                   onChange={(e) => setTextInput(e.target.value)}
                   placeholder="Paste knowledge here..."
                   className="w-full h-40 border border-slate-300 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  disabled={isSaving}
+                  disabled={isSaving || isIndexing}
                 />
               </div>
               <button
                 onClick={saveRawText}
-                disabled={isSaving}
+                disabled={isSaving || isIndexing}
                 className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition disabled:bg-indigo-400 disabled:cursor-not-allowed"
               >
-                {isSaving ? "Saving..." : "Ingest Text"}
+                {isSaving || isIndexing ? "Indexing..." : "Ingest Text"}
               </button>
             </div>
           )}

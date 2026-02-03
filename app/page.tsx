@@ -15,6 +15,7 @@ import Testimonials from "@/landing/Testimonials";
 import Security from "@/landing/Security";
 import FinalCTA from "@/landing/FinalCTA";
 import Footer from "@/landing/Footer";
+import Hero2 from "@/landing/Hero2";
 
 const App: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -31,10 +32,10 @@ const App: React.FC = () => {
     <div className="relative overflow-hidden">
       <Navbar scrolled={scrolled} />
       <main>
-        <Hero />
+        <Hero2 />
         <HowItWorks />
         <Benefits />
-        <Testimonials />
+        {/* <Testimonials /> */}
         <FinalCTA />
       </main>
       <Footer />

@@ -37,11 +37,10 @@ const PlatformPreview: React.FC = () => {
                     role="tab"
                     aria-selected={active}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
-                      active
-                        ? "bg-zinc-950 text-white"
-                        : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                    }`}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${active
+                      ? "bg-zinc-950 text-white"
+                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                      }`}
                   >
                     {tab}
                   </button>
@@ -74,7 +73,7 @@ const PlatformPreview: React.FC = () => {
               <div className="rounded-2xl overflow-hidden border border-zinc-200 bg-zinc-950">
                 <img
                   key={activeTab}
-                  src={`https://picsum.photos/seed/${activeTab}/1200/720`}
+                  src={`/logo.jpeg`}
                   alt={activeTab}
                   className="w-full h-auto opacity-90 saturate-0 contrast-110 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500"
                 />

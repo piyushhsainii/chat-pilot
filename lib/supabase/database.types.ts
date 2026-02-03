@@ -259,7 +259,7 @@ export type Database = {
         Row: {
           bot_id: string | null
           created_at: string | null
-          doc_url: string | null
+          doc_url: string[] | null
           id: string
           last_indexed: string | null
           name: string
@@ -269,7 +269,7 @@ export type Database = {
         Insert: {
           bot_id?: string | null
           created_at?: string | null
-          doc_url?: string | null
+          doc_url?: string[] | null
           id?: string
           last_indexed?: string | null
           name: string
@@ -279,7 +279,7 @@ export type Database = {
         Update: {
           bot_id?: string | null
           created_at?: string | null
-          doc_url?: string | null
+          doc_url?: string[] | null
           id?: string
           last_indexed?: string | null
           name?: string
@@ -417,6 +417,56 @@ export type Database = {
           },
         ]
       }
+      workspace_connectors: {
+        Row: {
+          calendly_api_token: string | null
+          calendly_scheduling_url: string | null
+          created_at: string
+          google_access_token: string | null
+          google_access_token_expires_at: string | null
+          google_refresh_token: string | null
+          google_scopes: string[] | null
+          id: string
+          provider: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          calendly_api_token?: string | null
+          calendly_scheduling_url?: string | null
+          created_at?: string
+          google_access_token?: string | null
+          google_access_token_expires_at?: string | null
+          google_refresh_token?: string | null
+          google_scopes?: string[] | null
+          id?: string
+          provider: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          calendly_api_token?: string | null
+          calendly_scheduling_url?: string | null
+          created_at?: string
+          google_access_token?: string | null
+          google_access_token_expires_at?: string | null
+          google_refresh_token?: string | null
+          google_scopes?: string[] | null
+          id?: string
+          provider?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_connectors_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_users: {
         Row: {
           auth_user_id: string
@@ -493,20 +543,35 @@ export type Database = {
         }[]
       }
       deduct_credit: { Args: { p_user_id: string }; Returns: boolean }
-      match_documents: {
-        Args: {
-          match_count: number
-          match_threshold: number
-          p_bot_id: string
-          query_embedding: string
-        }
-        Returns: {
-          content: string
-          id: string
-          metadata: Json
-          similarity: number
-        }[]
-      }
+      match_documents:
+        | {
+            Args: {
+              match_count: number
+              match_threshold: number
+              p_bot_id: string
+              query_embedding: string
+            }
+            Returns: {
+              content: string
+              id: string
+              metadata: Json
+              similarity: number
+            }[]
+          }
+        | {
+            Args: {
+              match_count: number
+              match_threshold: number
+              p_bot_id: string
+              query_embedding: string
+            }
+            Returns: {
+              content: string
+              id: string
+              metadata: Json
+              similarity: number
+            }[]
+          }
     }
     Enums: {
       [_ in never]: never

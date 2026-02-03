@@ -3,7 +3,9 @@ import { validateBot } from "@/lib/bot/validateBot";
 import OpenAI from "openai";
 import { checkRateLimit } from "@/lib/checkrateLimit";
 import { createClient } from "@/lib/supabase/server";
-import { buildKnowledgeContext } from "@/lib/knowledge/buildKnowledgeContext";
+import { buildKnowledgeContextForQuery } from "@/lib/knowledge/buildKnowledgeContextForQuery";
+import { consumeCreditsForOwner, getOwnerCreditsPrivileged } from "@/lib/billing/credits";
+import { insertChatLog } from "@/lib/analytics/chatLogs";
 
 export async function POST(req: NextRequest) {
   if (!process.env.OPENAI_API_KEY) {
@@ -31,6 +33,20 @@ export async function POST(req: NextRequest) {
   const bot = await validateBot(botId, req.headers.get("referer"));
   if (!bot) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const ownerId = (bot as any).owner_id as string | undefined;
+  if (!ownerId) {
+    return NextResponse.json({ error: "Bot owner not found" }, { status: 400 });
+  }
+
+  // Credits: block at 0 to avoid unbounded usage.
+  const ownerBalance = await getOwnerCreditsPrivileged(ownerId);
+  if (ownerBalance !== null && ownerBalance <= 0) {
+    return NextResponse.json(
+      { answer: "This agent is temporarily unavailable (no credits)." },
+      { status: 402 },
+    );
   }
 
   // 2️⃣ Load settings
@@ -64,8 +80,13 @@ export async function POST(req: NextRequest) {
     .neq("status", "failed")
     .order("created_at", { ascending: false });
 
-  const { contextText } = await buildKnowledgeContext(
-    ((sources as any[]) ?? []) as any,
+  const { contextText } = await buildKnowledgeContextForQuery(
+    supabaseServer as any,
+    {
+      botId,
+      query: String(message),
+      sources: ((sources as any[]) ?? []) as any,
+    },
   );
 
   const systemPrompt = `
@@ -98,12 +119,22 @@ ${contextText}
     bot.fallback_behavior ||
     "Sorry, I could not answer that.";
 
-  // 6️⃣ Log conversation
-  await supabaseServer.from("chat_logs").insert({
-    bot_id: botId,
-    question: message,
-    answer,
-  });
+  // 6️⃣ Log conversation + consume credits
+  await Promise.all([
+    insertChatLog({
+      botId,
+      question: message,
+      answer,
+      environment: "api_v1",
+      metadata: { ip },
+    }),
+    consumeCreditsForOwner({
+      ownerId,
+      botId,
+      amount: 1,
+      reason: "api_v1_chat",
+    }),
+  ]);
 
   return NextResponse.json({ answer });
 }

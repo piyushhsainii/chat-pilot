@@ -10,7 +10,6 @@ type UseCase = {
 type Integration = {
   id: string;
   label: string;
-  src: string;
   pos: { x: number; y: number };
 };
 
@@ -44,34 +43,29 @@ const useCases: UseCase[] = [
 
 const integrations: Integration[] = [
   {
-    id: "instagram",
-    label: "Instagram",
-    src: "https://cdn.simpleicons.org/instagram",
-    pos: { x: 145, y: 115 },
+    id: "customer-care",
+    label: "Customer care support",
+    pos: { x: 235, y: 140 },
   },
   {
-    id: "googleads",
-    label: "Google Ads",
-    src: "https://cdn.simpleicons.org/googleads",
-    pos: { x: 250, y: 115 },
+    id: "personal-assistant",
+    label: "Personal assistant",
+    pos: { x: 475, y: 140 },
   },
   {
-    id: "meta",
-    label: "Meta",
-    src: "https://cdn.simpleicons.org/meta",
-    pos: { x: 355, y: 115 },
+    id: "shopify-salesman",
+    label: "Shopify salesman agent",
+    pos: { x: 230, y: 250 },
   },
   {
-    id: "stripe",
-    label: "Stripe",
-    src: "https://cdn.simpleicons.org/stripe",
-    pos: { x: 460, y: 115 },
+    id: "general-faq",
+    label: "General FAQ support",
+    pos: { x: 480, y: 250 },
   },
   {
-    id: "shopify",
-    label: "Shopify",
-    src: "https://cdn.simpleicons.org/shopify",
-    pos: { x: 565, y: 115 },
+    id: "appointment-scheduler",
+    label: "Appointment scheduler agent",
+    pos: { x: 355, y: 70 },
   },
 ];
 
@@ -89,9 +83,7 @@ function pathToHub(from: { x: number; y: number }) {
 const Benefits: React.FC = () => {
   const shouldReduceMotion = useReducedMotion();
   const [activeId, setActiveId] = useState(useCases[2].id);
-  const [activeIntegrationId, setActiveIntegrationId] = useState(
-    integrations[2].id
-  );
+  const [activeIntegrationId, setActiveIntegrationId] = useState(integrations[0].id);
 
   const active = useMemo(
     () => useCases.find((u) => u.id === activeId) ?? useCases[0],
@@ -99,7 +91,10 @@ const Benefits: React.FC = () => {
   );
 
   return (
-    <section className="py-20 md:py-28 bg-white text-zinc-950 relative overflow-hidden">
+    <section
+      id="services"
+      className="py-20 md:py-28 bg-white text-zinc-950 relative overflow-hidden"
+    >
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-24 left-1/2 h-[520px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.07),transparent_62%)]" />
         <div className="absolute -bottom-44 left-[-220px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.05),transparent_62%)]" />
@@ -128,7 +123,7 @@ const Benefits: React.FC = () => {
                   </defs>
 
                   {integrations.map((i) => {
-                    const d = pathToHub({ x: i.pos.x, y: i.pos.y + 34 });
+                    const d = pathToHub({ x: i.pos.x, y: i.pos.y + 18 });
                     const isActive = i.id === activeIntegrationId;
 
                     return (
@@ -200,7 +195,7 @@ const Benefits: React.FC = () => {
                 <div className="absolute inset-0">
                   <div
                     className="absolute inset-0"
-                    onMouseLeave={() => setActiveIntegrationId(integrations[2].id)}
+                    onMouseLeave={() => setActiveIntegrationId(integrations[0].id)}
                   >
                     {integrations.map((i) => {
                       const isActive = i.id === activeIntegrationId;
@@ -220,17 +215,17 @@ const Benefits: React.FC = () => {
                             shouldReduceMotion
                               ? undefined
                               : {
-                                  y: -2,
-                                  scale: 1.03,
-                                  transition: {
-                                    type: "spring",
-                                    stiffness: 420,
-                                    damping: 26,
-                                  },
-                                }
+                                y: -2,
+                                scale: 1.03,
+                                transition: {
+                                  type: "spring",
+                                  stiffness: 420,
+                                  damping: 26,
+                                },
+                              }
                           }
                           className={
-                            "absolute -translate-x-1/2 -translate-y-1/2 rounded-2xl border h-14 w-14 shadow-sm bg-white/90 backdrop-blur-sm transition overflow-hidden flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-600/30 " +
+                            "absolute -translate-x-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-2xl border shadow-sm bg-white/90 backdrop-blur-sm transition px-4 py-2 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-600/30 " +
                             (isActive
                               ? "border-sky-200 shadow-[0_12px_30px_-16px_rgba(2,132,199,0.65)]"
                               : "border-zinc-200 hover:border-zinc-300")
@@ -238,13 +233,9 @@ const Benefits: React.FC = () => {
                           style={{ left: `${x}%`, top: `${y}%` }}
                           aria-current={isActive ? "true" : undefined}
                         >
-                          <img
-                            src={i.src}
-                            alt={i.label}
-                            className="h-7 w-7"
-                            loading="lazy"
-                            decoding="async"
-                          />
+                          <span className="text-[10px] md:text-[11px] font-semibold text-zinc-700 leading-none whitespace-nowrap">
+                            {i.label}
+                          </span>
                         </motion.button>
                       );
                     })}
@@ -262,7 +253,7 @@ const Benefits: React.FC = () => {
                     <div className="h-[92px] w-[92px] rounded-[22px] bg-white border border-zinc-200 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.55)] flex items-center justify-center">
                       <div className="h-[70px] w-[70px] rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,0.35),rgba(14,116,144,0.15))] border border-sky-200/50 flex items-center justify-center shadow-inner">
                         <img
-                          src="/logo2.png"
+                          src="/logo.jpeg"
                           alt="Chat Pilot"
                           className="h-10 w-auto select-none"
                         />
