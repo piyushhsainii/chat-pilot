@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateBot } from "@/lib/bot/validateBot";
-import { generateChatHTML } from "@/lib/widget/generateChatHTML";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -15,36 +14,10 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Unauthorized", { status: 403 });
   }
 
-  const allowedDomains = bot.bot_settings?.allowed_domains?.length
-    ? bot.bot_settings.allowed_domains
-        .map((d: string) => `https://${d}`)
-        .join(" ")
-    : "*";
-
-  const csp = `
-    default-src 'none';
-    style-src 'unsafe-inline';
-    img-src data:;
-    script-src 'unsafe-inline';
-    connect-src https://api.openai.com https://chat-pilot-agent.vercel.app;
-    frame-ancestors ${allowedDomains};
-  `.replace(/\s+/g, " ");
-
-  const html = generateChatHTML({
-    botId,
-    name: bot.widgets?.title || bot.name,
-    theme: (bot.widgets?.theme as "light" | "dark") || "light",
-    primary: bot.widgets?.primary_color || "",
-    textColor: bot.widgets?.button_color || "ffffff",
-    embedded: true,
-    welcomeMessage: bot.widgets?.greeting_message || "Hi! How can I help you?",
-  });
-
-  return new NextResponse(html, {
-    headers: {
-      "Content-Type": "text/html",
-      "Content-Security-Policy": csp,
-      "X-Frame-Options": "SAMEORIGIN",
-    },
-  });
+  // Redirect to the dedicated widget UI. Returning an HTML shell that loads
+  // `widget.js` can cause nested widget injection when used inside iframes.
+  const url = new URL("/widget/chat", req.url);
+  url.searchParams.set("botId", botId);
+  url.searchParams.set("embedded", "true");
+  return NextResponse.redirect(url, 307);
 }

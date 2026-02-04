@@ -425,7 +425,7 @@ function WidgetChatContent() {
     const theme = config?.widget?.theme || config?.theme || "light";
     const botName = config?.widget?.title || config?.widget?.name || config?.title || config?.name || "Chat Pilot";
 
-    const primaryCss = toCssColor(primaryColor, "");
+    const primaryCss = toCssColor(primaryColor, "#6366f1");
     const textCss = toCssColor(textColor, "#ffffff");
 
     const botTone = config?.bot?.tone ?? config?.tone ?? null;
@@ -815,8 +815,11 @@ function WidgetChatContent() {
                         <div style={{
                             display: "flex",
                             gap: "8px",
-                            overflowX: "auto",
-                            padding: "0 2px 10px",
+                            flexWrap: "wrap",
+                            overflowX: "hidden",
+                            overflowY: "auto",
+                            maxHeight: "96px",
+                            padding: "0 2px 12px",
                             WebkitOverflowScrolling: "touch",
                         }}>
                             {toneSuggestions.map((s: string, idx: number) => (
@@ -824,23 +827,36 @@ function WidgetChatContent() {
                                     key={`${idx}-${s}`}
                                     onClick={() => sendMessage(s)}
                                     style={{
-                                        padding: "8px 10px",
+                                        padding: "9px 12px",
                                         borderRadius: "999px",
-                                        border: theme === "dark" ? "1px solid #334155" : "1px solid #e2e8f0",
-                                        backgroundColor: theme === "dark" ? "#0b1220" : "#ffffff",
+                                        border: theme === "dark" ? "1px solid #253046" : "1px solid #e2e8f0",
+                                        backgroundColor: theme === "dark" ? "rgba(15, 23, 42, 0.55)" : "rgba(255,255,255,0.9)",
                                         color: theme === "dark" ? "#e2e8f0" : "#0f172a",
                                         fontSize: "12px",
                                         fontWeight: 600,
                                         cursor: "pointer",
-                                        whiteSpace: "nowrap",
-                                        transition: "transform 0.15s, border-color 0.15s",
+                                        flex: "1 1 170px",
+                                        maxWidth: "100%",
+                                        whiteSpace: "normal",
+                                        textAlign: "left",
+                                        lineHeight: 1.25,
+                                        transition: "transform 0.15s, border-color 0.15s, background-color 0.15s, box-shadow 0.15s",
+                                        boxShadow: theme === "dark" ? "0 1px 0 rgba(255,255,255,0.04)" : "0 1px 0 rgba(15, 23, 42, 0.04)",
                                     }}
                                     onMouseOver={(e) => {
                                         e.currentTarget.style.borderColor = primaryCss;
+                                        e.currentTarget.style.backgroundColor = theme === "dark"
+                                            ? "rgba(99, 102, 241, 0.15)"
+                                            : "rgba(99, 102, 241, 0.08)";
+                                        e.currentTarget.style.boxShadow = theme === "dark"
+                                            ? `0 0 0 3px ${primaryCss}22`
+                                            : `0 0 0 3px ${primaryCss}1a`;
                                         e.currentTarget.style.transform = "translateY(-1px)";
                                     }}
                                     onMouseOut={(e) => {
-                                        e.currentTarget.style.borderColor = theme === "dark" ? "#334155" : "#e2e8f0";
+                                        e.currentTarget.style.borderColor = theme === "dark" ? "#253046" : "#e2e8f0";
+                                        e.currentTarget.style.backgroundColor = theme === "dark" ? "rgba(15, 23, 42, 0.55)" : "rgba(255,255,255,0.9)";
+                                        e.currentTarget.style.boxShadow = theme === "dark" ? "0 1px 0 rgba(255,255,255,0.04)" : "0 1px 0 rgba(15, 23, 42, 0.04)";
                                         e.currentTarget.style.transform = "translateY(0)";
                                     }}
                                 >

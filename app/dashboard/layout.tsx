@@ -43,9 +43,19 @@ export default async function RootLayout({
             workspaces: workspaceData.workspaces,
           }}
         />
-        <div className="flex min-h-screen bg-slate-50 font-sans antialiased text-slate-900 overflow-hidden">
+        <div
+          className="flex h-screen bg-slate-50 font-sans antialiased text-slate-900 overflow-hidden"
+          style={{ "--cp-sidebar-w": "256px" } as React.CSSProperties}
+        >
           <Sidebar />
-          <main className="flex-1 p-8 transition-all duration-300 max-w-full overflow-y-auto overflow-x-hidden">
+          {/* Spacer for fixed sidebar */}
+          <div
+            className="shrink-0 transition-[width] duration-300"
+            style={{ width: "var(--cp-sidebar-w, 256px)" }}
+          />
+          <main
+            className="flex-1 min-h-0 p-8 max-w-full overflow-y-auto overflow-x-hidden"
+          >
             {children}
           </main>
         </div>

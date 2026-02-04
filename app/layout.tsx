@@ -91,6 +91,7 @@ export default function RootLayout({
           data-bot-id="38fcdfb6-a8b6-44f4-89a2-3c0116df8816"
           defer
         ></script>
+
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

@@ -1,5 +1,40 @@
 (function () {
+  // Prevent the widget from recursively embedding itself inside the widget iframe.
+  // (This can happen if the host app includes widget.js globally.)
+  try {
+    const isFramed = window.self !== window.top;
+    const url = new URL(window.location.href);
+    const isWidgetChat = url.pathname.includes("/widget/chat");
+    if (isFramed && isWidgetChat) return;
+  } catch {
+    // ignore
+  }
+
   if (window.ChatPilotWidget) return;
+
+  // Prevent recursive/nested widget injection.
+  // The widget renders the chat UI inside an iframe; if `widget.js` is ever
+  // included on the iframe page (or any embedded context), we must no-op.
+  const __cp_isEmbeddedContext = (() => {
+    try {
+      if (window.self !== window.top) return true;
+    } catch {
+      return true;
+    }
+
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("embedded")) return true;
+      if (u.pathname.includes("/widget/chat")) return true;
+      if (u.pathname.includes("/api/widget/chat")) return true;
+    } catch {
+      // ignore
+    }
+
+    return false;
+  })();
+
+  if (__cp_isEmbeddedContext) return;
 
   class ChatPilotWidget {
     constructor() {
@@ -38,7 +73,7 @@
           primary: cfg.primary || cfg.primary_color,
           buttonColor:
             cfg.buttonColor || cfg.button_color || cfg.button || null,
-          textColor: cfg.textColor || cfg.text || cfg.text_color || "ffffff",
+          textColor: cfg.textColor || cfg.text || cfg.text_color || null,
           name: cfg.name || "Chat Assistant",
         };
       }
@@ -70,7 +105,7 @@
               theme: widgetScript.getAttribute("data-theme") || "light",
               primary: widgetScript.getAttribute("data-primary"),
               buttonColor: widgetScript.getAttribute("data-button") || null,
-              textColor: widgetScript.getAttribute("data-text") || "ffffff",
+              textColor: widgetScript.getAttribute("data-text") || null,
               name: decodeURIComponent(
                 widgetScript.getAttribute("data-name") || "Chat Assistant",
               ),
@@ -107,7 +142,7 @@
         theme: script.getAttribute("data-theme") || "light",
         primary: script.getAttribute("data-primary"),
         buttonColor: script.getAttribute("data-button") || null,
-        textColor: script.getAttribute("data-text") || "ffffff",
+        textColor: script.getAttribute("data-text") || null,
         name: decodeURIComponent(
           script.getAttribute("data-name") || "Chat Assistant",
         ),
@@ -143,7 +178,10 @@
     requestConfigFromIframe() {
       try {
         if (!this.iframe || !this.iframe.contentWindow) return;
-        this.iframe.contentWindow.postMessage({ type: "chatpilot:config:request" }, "*");
+        this.iframe.contentWindow.postMessage(
+          { type: "chatpilot:config:request" },
+          "*",
+        );
       } catch {
         // ignore
       }
@@ -269,7 +307,7 @@
       );
 
       const textColor = this.config.textColor
-        ? normalizeHex(this.config.textColor, "#ffffff")
+        ? normalizeHex(this.config.textColor, "")
         : "";
 
       const hexToRgb = (hex) => {
@@ -371,18 +409,19 @@
         embedded: "true",
       });
 
-      const normalizeHex = (hex) => {
-        if (!hex) return "#6366f1";
+      const normalizeHex = (hex, fallback) => {
+        if (!hex) return fallback;
         const v = String(hex).trim();
-        if (!v) return "#6366f1";
+        if (!v) return fallback;
         const cleaned = v.replace(/^#+/, "#");
         return cleaned.startsWith("#") ? cleaned : `#${cleaned}`;
       };
 
       const primary = normalizeHex(
         this.config.buttonColor || this.config.primary,
+        "#6366f1",
       );
-      const textColor = normalizeHex(this.config.textColor);
+      const textColor = normalizeHex(this.config.textColor, "");
 
       // Convert hex to RGB for shadow
       const hexToRgb = (hex) => {
@@ -400,6 +439,12 @@
       const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`;
       const shadowColorHover = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
 
+      const derivedTextColor = (() => {
+        if (textColor) return textColor;
+        const yiq = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+        return yiq >= 170 ? "#111827" : "#ffffff";
+      })();
+
       return `
 <style>
   * {
@@ -414,7 +459,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     --cp-primary: ${primary};
-    --cp-text: ${textColor};
+    --cp-text: ${derivedTextColor};
     --cp-shadow: ${shadowColor};
     --cp-shadow-hover: ${shadowColorHover};
   }

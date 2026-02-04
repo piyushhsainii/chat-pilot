@@ -20,6 +20,17 @@ const Sidebar: React.FC = () => {
   const [creditsError, setCreditsError] = useState<string | null>(null);
   const router = useRouter();
 
+  const applySidebarWidthVar = (collapsed: boolean) => {
+    try {
+      document.documentElement.style.setProperty(
+        "--cp-sidebar-w",
+        collapsed ? "80px" : "256px",
+      );
+    } catch {
+      // ignore
+    }
+  };
+
   const navItems = [
     { id: "overview", label: "Home", path: "/dashboard", icon: <LayoutDashboard /> },
     { id: "bots", label: "My Agents", path: "/dashboard/agents", icon: <BotIcon /> },
@@ -56,7 +67,11 @@ const Sidebar: React.FC = () => {
     setMounted(true);
     const savedState = localStorage.getItem("isSidebarCollapsed");
     if (savedState !== null) {
-      setIsCollapsed(savedState === "true");
+      const collapsed = savedState === "true";
+      setIsCollapsed(collapsed);
+      applySidebarWidthVar(collapsed);
+    } else {
+      applySidebarWidthVar(false);
     }
 
     // Set active tab based on current path
@@ -90,6 +105,7 @@ const Sidebar: React.FC = () => {
     const newState = !isCollapsed;
     setIsCollapsed(newState);
     localStorage.setItem("isSidebarCollapsed", String(newState));
+    applySidebarWidthVar(newState);
   };
 
   // Handle navigation
@@ -110,7 +126,7 @@ const Sidebar: React.FC = () => {
   // Prevent hydration mismatch - render placeholder during SSR
   if (!mounted) {
     return (
-      <div className="w-64 relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col sticky top-0 z-40 bg-gradient-to-b from-white via-slate-50 to-indigo-50/60">
+      <div className="w-64 relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col fixed top-0 left-0 z-40 bg-gradient-to-b from-white via-slate-50 to-indigo-50/60">
         <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(600px_circle_at_20%_0%,rgba(99,102,241,0.22),transparent_60%),radial-gradient(500px_circle_at_20%_90%,rgba(14,165,233,0.14),transparent_65%)]" />
 
         <div className="relative p-5 border-b border-white/60 bg-white/55 backdrop-blur-sm flex items-center justify-between">
@@ -128,7 +144,7 @@ const Sidebar: React.FC = () => {
 
   return (
     <div
-      className={`${isCollapsed ? "w-20" : "w-64"} relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col sticky top-0 z-40 transition-all duration-300 ease-in-out bg-gradient-to-b from-white via-slate-50 to-indigo-50/60`}
+      className={`${isCollapsed ? "w-20" : "w-64"} relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col fixed top-0 z-40 transition-all duration-300 ease-in-out bg-gradient-to-b from-white via-slate-50 to-indigo-50/60`}
     >
       <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(600px_circle_at_20%_0%,rgba(99,102,241,0.22),transparent_60%),radial-gradient(500px_circle_at_20%_90%,rgba(14,165,233,0.14),transparent_65%)]" />
 
@@ -187,8 +203,8 @@ const Sidebar: React.FC = () => {
         <div className="relative p-4 border-t border-white/60 bg-white/45 backdrop-blur-sm animate-in fade-in duration-500">
           <div
             className={`p-3 rounded-2xl border ${credits !== null && credits <= 20
-                ? "bg-amber-50 border-amber-200"
-                : "bg-gradient-to-br from-white/70 to-indigo-50/70 border-white/60 ring-1 ring-indigo-500/10"
+              ? "bg-amber-50 border-amber-200"
+              : "bg-gradient-to-br from-white/70 to-indigo-50/70 border-white/60 ring-1 ring-indigo-500/10"
               }`}
           >
             <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-tighter">

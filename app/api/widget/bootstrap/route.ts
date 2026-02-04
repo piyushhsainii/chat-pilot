@@ -61,6 +61,7 @@ export async function GET(req: Request) {
       theme: widget?.theme,
       primary_color: widget?.primary_color,
       button_color: widget?.button_color,
+      text_color: (widget as any)?.text_color,
     },
     limits: {
       rate_limit: settings?.rate_limit ?? 60,
