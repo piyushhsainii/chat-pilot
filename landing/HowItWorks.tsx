@@ -198,15 +198,15 @@ const HowItWorks: React.FC = () => {
     [activeStep]
   );
 
-  const registerStepRef = useCallback((idx, node) => {
+  const registerStepRef = useCallback((idx: any, node: any) => {
     stepRefs.current[idx] = node;
   }, []);
 
-  const setActiveFromScroll = useCallback((idx) => {
+  const setActiveFromScroll = useCallback((idx: any) => {
     if (!isManualScrolling.current) setActiveStep(idx);
   }, []);
 
-  const scrollTo = useCallback((idx) => {
+  const scrollTo = useCallback((idx: any) => {
     const el = stepRefs.current[idx];
     if (!el) return;
 
