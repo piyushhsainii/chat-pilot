@@ -4,6 +4,7 @@ import { useDashboardStore } from "@/store/dashboardStore";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
+import HorizontalBotSelector from "./HorizontalBotSelector";
 
 type ConfigCheck = {
   label: string;
@@ -251,424 +252,329 @@ const DeployManager: React.FC = () => {
   return (
     <div>
       {/* Bot Grid */}
-      {bots && bots.length > 0 ? (
-        <div className="relative">
-          {/* Scroll container */}
-          <div
-            className="
-        flex gap-4 px-4 py-2
-        overflow-x-auto overflow-y-hidden
-        snap-x snap-mandatory
-        scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent
-      "
-          >
-            {bots.map((bot) => {
-              const checks = getBotConfigChecks(bot);
-              const progress = getConfigProgress(checks);
-              const configured = isBotFullyConfigured(bot);
 
-              return (
-                <button
-                  key={bot.id}
-                  disabled={!configured}
-                  onClick={() => configured && setSelectedBotId(bot.id)}
-                  className={`
-              relative
-              snap-start
-              min-w-[260px] max-w-[260px]
-              sm:min-w-[280px] sm:max-w-[280px]
-              p-4 rounded-2xl border-2 text-left
-              transition-all flex-shrink-0
-              ${!configured
-                      ? "bg-slate-100 border-red-200 cursor-not-allowed opacity-80"
-                      : selectedBotId === bot.id
-                        ? "bg-white border-indigo-500 shadow-md scale-[1.02]"
-                        : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-lg"
-                    }
-            `}
-                >
-                  {/* Config error badge */}
-                  {!configured && (
-                    <Link
-                      href={`/dashboard/bots/${bot.id}/config`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute top-2 right-2 group"
-                    >
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-bold uppercase">
-                        Config Error
+      <div className="flex h-full bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm min-h-[750px] animate-in fade-in duration-500">
+        {/* Left Settings Panel */}
+        <div className="
+        w-1/2 border-r border-slate-100 flex flex-col">
+          {bots && bots.length > 0 ? (
+            <HorizontalBotSelector
+              bots={bots}
+              getBotConfigChecks={getBotConfigChecks}
+              getConfigProgress={getConfigProgress}
+              isBotFullyConfigured={isBotFullyConfigured}
+              selectedBotId={selectedBotId}
+              setSelectedBotId={setSelectedBotId}
+            />
+          ) : (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+              <p className="text-slate-500 text-sm">
+                No bots found. Create one to get started.
+              </p>
+            </div>
+          )}
+          <div className=" border-r border-slate-100 flex flex-col">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-indigo-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded tracking-tighter">
+                  BETA
+                </span>
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tighter">
+                  Widget Configuration
+                </h2>
+              </div>
+
+              <div className="flex gap-8 mt-4">
+                {["Content", "Style", "Embed"].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab.toLowerCase() as any)}
+                    className={`pb-4 text-sm font-bold transition-all relative tracking-tighter ${activeTab === tab.toLowerCase()
+                      ? "text-indigo-600"
+                      : "text-slate-400"
+                      }`}
+                  >
+                    {tab}
+                    {activeTab === tab.toLowerCase() && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-10">
+              {hasChanges && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
+                  <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                      <span className="text-sm font-semibold tracking-tight">
+                        You have unsaved changes
                       </span>
-
-                      {/* Tooltip */}
-                      <div className="
-                  absolute right-0 mt-2 w-56
-                  rounded-xl bg-white border border-slate-200
-                  shadow-lg p-3
-                  opacity-0 group-hover:opacity-100
-                  transition pointer-events-none
-                ">
-                        <p className="text-[10px] font-bold text-slate-600 mb-2 uppercase">
-                          Missing configuration
-                        </p>
-                        <ul className="space-y-1">
-                          {checks.filter(c => !c.valid).map(c => (
-                            <li
-                              key={c.label}
-                              className="text-[11px] text-red-600"
-                            >
-                              • {c.label}
-                            </li>
-                          ))}
-                        </ul>
-                        <p className="mt-2 text-[10px] text-indigo-600 font-semibold">
-                          Tap to fix →
-                        </p>
-                      </div>
-                    </Link>
-                  )}
-
-                  {/* Bot header */}
-                  <p className="text-sm font-bold text-slate-800 mb-1 truncate">
-                    {bot.name}
-                  </p>
-
-                  <span className="text-[9px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold uppercase">
-                    {bot.tone}
-                  </span>
-
-                  {/* Progress bar */}
-                  <div className="mt-4">
-                    <div className="flex justify-between text-[9px] font-semibold text-slate-500 mb-1">
-                      <span>Configuration</span>
-                      <span>{progress}%</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${progress === 100 ? "bg-emerald-500" : "bg-amber-400"
-                          }`}
-                        style={{ width: `${progress}%` }}
-                      />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={discardChanges}
+                        disabled={isSaving}
+                        className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white transition-colors rounded-lg hover:bg-white/10 tracking-tight disabled:opacity-50"
+                      >
+                        Discard
+                      </button>
+                      <button
+                        onClick={saveChanges}
+                        disabled={isSaving}
+                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 tracking-tight disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <span>💾</span>
+                            Save Changes
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
-                </button>
-              );
-            })}
-          </div>
+                </div>
+              )}
 
-          {/* Scroll fade indicators */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-slate-50 to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-slate-50 to-transparent" />
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
-          <p className="text-slate-500 text-sm">
-            No bots found. Create one to get started.
-          </p>
-        </div>
-      )}
-      <div className="flex h-full bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm min-h-[750px] animate-in fade-in duration-500">
-
-        {/* Left Settings Panel */}
-        <div className="w-1/2 border-r border-slate-100 flex flex-col">
-          <div className="p-6 border-b border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-indigo-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded tracking-tighter">
-                BETA
-              </span>
-              <h2 className="text-2xl font-bold text-slate-900 tracking-tighter">
-                Widget Configuration
-              </h2>
-            </div>
-
-            <div className="flex gap-8 mt-4">
-              {["Content", "Style", "Embed"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab.toLowerCase() as any)}
-                  className={`pb-4 text-sm font-bold transition-all relative tracking-tighter ${activeTab === tab.toLowerCase()
-                    ? "text-indigo-600"
-                    : "text-slate-400"
-                    }`}
-                >
-                  {tab}
-                  {activeTab === tab.toLowerCase() && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-8 space-y-10">
-            {hasChanges && (
-              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
-                <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+              {/* Success Message */}
+              {saveSuccess && (
+                <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-top-4 duration-300">
+                  <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+                    <span className="text-xl">✓</span>
                     <span className="text-sm font-semibold tracking-tight">
-                      You have unsaved changes
+                      Changes saved successfully!
                     </span>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={discardChanges}
-                      disabled={isSaving}
-                      className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white transition-colors rounded-lg hover:bg-white/10 tracking-tight disabled:opacity-50"
-                    >
-                      Discard
-                    </button>
-                    <button
-                      onClick={saveChanges}
-                      disabled={isSaving}
-                      className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 tracking-tight disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isSaving ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <span>💾</span>
-                          Save Changes
-                        </>
-                      )}
-                    </button>
-                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Success Message */}
-            {saveSuccess && (
-              <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-top-4 duration-300">
-                <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
-                  <span className="text-xl">✓</span>
-                  <span className="text-sm font-semibold tracking-tight">
-                    Changes saved successfully!
-                  </span>
+              {activeTab === "style" && (
+                <div className="space-y-10 animate-in slide-in-from-left-4 duration-300">
+                  <section className="space-y-4">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
+                      Interface Theme
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        onClick={() => setTheme("light")}
+                        className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "light"
+                          ? "border-indigo-600 bg-indigo-50/20"
+                          : "border-slate-100 bg-white"
+                          }`}
+                      >
+                        <div className="aspect-video bg-white border border-slate-200 rounded-lg mb-3 flex flex-col p-2 gap-1.5 overflow-hidden">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full bg-slate-200" />
+                            <div className="w-8 h-1 bg-slate-100 rounded" />
+                          </div>
+                          <div className="w-12 h-3 bg-slate-100 rounded-md" />
+                          <div className="w-full h-3 bg-slate-50 rounded-md mt-auto" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900 tracking-tighter">
+                          Light Mode
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setTheme("dark")}
+                        className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "dark"
+                          ? "border-indigo-600 bg-indigo-50/20"
+                          : "border-slate-100 bg-white"
+                          }`}
+                      >
+                        <div className="aspect-video bg-slate-900 border border-slate-800 rounded-lg mb-3 flex flex-col p-2 gap-1.5 overflow-hidden">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full bg-slate-700" />
+                            <div className="w-8 h-1 bg-slate-800 rounded" />
+                          </div>
+                          <div className="w-12 h-3 bg-slate-800 rounded-md" />
+                          <div className="w-full h-3 bg-slate-800 rounded-md mt-auto" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900 tracking-tighter">
+                          Dark Mode
+                        </span>
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
+                        Brand Colors
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                        <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                          Primary
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={primaryColor}
+                            onChange={(e) => setPrimaryColor(e.target.value)}
+                            className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
+                          />
+                          <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
+                            {primaryColor}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                        <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                          Bubble Text
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={textColor}
+                            onChange={(e) => setTextColor(e.target.value)}
+                            className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
+                          />
+                          <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
+                            {textColor}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 </div>
-              </div>
-            )}
+              )}
 
-            {activeTab === "style" && (
-              <div className="space-y-10 animate-in slide-in-from-left-4 duration-300">
-                <section className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                    Interface Theme
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setTheme("light")}
-                      className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "light"
-                        ? "border-indigo-600 bg-indigo-50/20"
-                        : "border-slate-100 bg-white"
-                        }`}
-                    >
-                      <div className="aspect-video bg-white border border-slate-200 rounded-lg mb-3 flex flex-col p-2 gap-1.5 overflow-hidden">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3 h-3 rounded-full bg-slate-200" />
-                          <div className="w-8 h-1 bg-slate-100 rounded" />
-                        </div>
-                        <div className="w-12 h-3 bg-slate-100 rounded-md" />
-                        <div className="w-full h-3 bg-slate-50 rounded-md mt-auto" />
-                      </div>
-                      <span className="text-xs font-bold text-slate-900 tracking-tighter">
-                        Light Mode
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setTheme("dark")}
-                      className={`p-4 rounded-2xl border-2 transition-all text-left ${theme === "dark"
-                        ? "border-indigo-600 bg-indigo-50/20"
-                        : "border-slate-100 bg-white"
-                        }`}
-                    >
-                      <div className="aspect-video bg-slate-900 border border-slate-800 rounded-lg mb-3 flex flex-col p-2 gap-1.5 overflow-hidden">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3 h-3 rounded-full bg-slate-700" />
-                          <div className="w-8 h-1 bg-slate-800 rounded" />
-                        </div>
-                        <div className="w-12 h-3 bg-slate-800 rounded-md" />
-                        <div className="w-full h-3 bg-slate-800 rounded-md mt-auto" />
-                      </div>
-                      <span className="text-xs font-bold text-slate-900 tracking-tighter">
-                        Dark Mode
-                      </span>
-                    </button>
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="flex justify-between items-center">
+              {activeTab === "content" && (
+                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                  <section className="space-y-4">
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                      Brand Colors
+                      Bot Identity
                     </h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                      <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
-                        Primary
-                      </label>
-                      <div className="flex items-center gap-3">
+                    <div className="space-y-6">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 mb-2 block tracking-tighter">
+                          Display Name
+                        </label>
                         <input
-                          type="color"
-                          value={primaryColor}
-                          onChange={(e) => setPrimaryColor(e.target.value)}
-                          className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
+                          type="text"
+                          value={botName}
+                          onChange={(e) => setBotName(e.target.value)}
+                          className="w-full px-5 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 font-medium tracking-tighter"
+                          placeholder="e.g. Chat Pilot Assistant"
                         />
-                        <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
-                          {primaryColor}
-                        </span>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 mb-2 block tracking-tighter">
+                          Greeting Message
+                        </label>
+                        <textarea
+                          value={welcomeMessage || ""}
+                          onChange={(e) => setWelcomeMessage(e.target.value)}
+                          className="w-full px-5 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 h-32 resize-none font-medium leading-relaxed tracking-tighter"
+                          placeholder="Welcome your users..."
+                        />
                       </div>
                     </div>
-                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                      <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
-                        Bubble Text
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={textColor}
-                          onChange={(e) => setTextColor(e.target.value)}
-                          className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
-                        />
-                        <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
-                          {textColor}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            )}
+                  </section>
+                </div>
+              )}
 
-            {activeTab === "content" && (
-              <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
-                <section className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                    Bot Identity
-                  </h3>
-                  <div className="space-y-6">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 mb-2 block tracking-tighter">
-                        Display Name
-                      </label>
-                      <input
-                        type="text"
-                        value={botName}
-                        onChange={(e) => setBotName(e.target.value)}
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 font-medium tracking-tighter"
-                        placeholder="e.g. Chat Pilot Assistant"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 mb-2 block tracking-tighter">
-                        Greeting Message
-                      </label>
-                      <textarea
-                        value={welcomeMessage || ""}
-                        onChange={(e) => setWelcomeMessage(e.target.value)}
-                        className="w-full px-5 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 h-32 resize-none font-medium leading-relaxed tracking-tighter"
-                        placeholder="Welcome your users..."
-                      />
-                    </div>
-                  </div>
-                </section>
-              </div>
-            )}
-
-            {activeTab === "embed" && (
-              <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
-                <section className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                    Embed Options
-                  </h3>
-
-                  <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">
-                        Global Widget Script
-                      </span>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(embedCode)}
-                        className="text-[10px] font-bold bg-white/10 text-white px-3 py-1 rounded-lg hover:bg-indigo-600 transition-colors tracking-tighter"
-                      >
-                        Copy Code
-                      </button>
-                    </div>
-                    <code className="text-[11px] text-indigo-100 font-mono break-all leading-relaxed block whitespace-pre-wrap tracking-tighter">
-                      {embedCode}
-                    </code>
-                  </div>
-
-                  <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
-                        iFrame Embed
-                      </span>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(iframeCode)}
-                        className="text-[10px] font-bold bg-white/10 text-white px-3 py-1 rounded-lg hover:bg-emerald-600 transition-colors tracking-tighter"
-                      >
-                        Copy Code
-                      </button>
-                    </div>
-                    <code className="text-[11px] text-emerald-100 font-mono break-all leading-relaxed block whitespace-pre-wrap tracking-tighter">
-                      {iframeCode}
-                    </code>
-                  </div>
-
-                  <div className="pt-6 space-y-4">
+              {activeTab === "embed" && (
+                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                  <section className="space-y-4">
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                      Security Whitelist
+                      Embed Options
                     </h3>
-                    <p className="text-xs text-slate-500 tracking-tighter">
-                      Only authorized domains can render this widget.
-                    </p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={domainInput}
-                        onChange={(e) => setDomainInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            addDomain();
-                          }
-                        }}
-                        placeholder="myapp.com"
-                        className="flex-1 bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-medium focus:border-indigo-500 outline-none tracking-tighter"
-                      />
-                      <button
-                        onClick={addDomain}
-                        className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all tracking-tighter"
-                      >
-                        Authorize
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      {allowedDomains.map((domain) => (
-                        <span
-                          key={domain}
-                          className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-2 border border-slate-200 tracking-tighter"
+
+                    <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">
+                          Global Widget Script
+                        </span>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(embedCode)}
+                          className="text-[10px] font-bold bg-white/10 text-white px-3 py-1 rounded-lg hover:bg-indigo-600 transition-colors tracking-tighter"
                         >
-                          {domain}
-                          <button
-                            onClick={() => removeDomain(domain)}
-                            className="text-slate-400 hover:text-red-500"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      ))}
+                          Copy Code
+                        </button>
+                      </div>
+                      <code className="text-[11px] text-indigo-100 font-mono break-all leading-relaxed block whitespace-pre-wrap tracking-tighter">
+                        {embedCode}
+                      </code>
                     </div>
-                  </div>
-                </section>
-              </div>
-            )}
 
+                    <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
+                          iFrame Embed
+                        </span>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(iframeCode)}
+                          className="text-[10px] font-bold bg-white/10 text-white px-3 py-1 rounded-lg hover:bg-emerald-600 transition-colors tracking-tighter"
+                        >
+                          Copy Code
+                        </button>
+                      </div>
+                      <code className="text-[11px] text-emerald-100 font-mono break-all leading-relaxed block whitespace-pre-wrap tracking-tighter">
+                        {iframeCode}
+                      </code>
+                    </div>
+
+                    <div className="pt-6 space-y-4">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
+                        Security Whitelist
+                      </h3>
+                      <p className="text-xs text-slate-500 tracking-tighter">
+                        Only authorized domains can render this widget.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={domainInput}
+                          onChange={(e) => setDomainInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              addDomain();
+                            }
+                          }}
+                          placeholder="myapp.com"
+                          className="flex-1 bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-medium focus:border-indigo-500 outline-none tracking-tighter"
+                        />
+                        <button
+                          onClick={addDomain}
+                          className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all tracking-tighter"
+                        >
+                          Authorize
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {allowedDomains.map((domain) => (
+                          <span
+                            key={domain}
+                            className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-2 border border-slate-200 tracking-tighter"
+                          >
+                            {domain}
+                            <button
+                              onClick={() => removeDomain(domain)}
+                              className="text-slate-400 hover:text-red-500"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              )}
+
+            </div>
           </div>
-        </div>
 
+        </div>
         {/* Right Preview Panel (Simulated Production Environment) */}
         <div className="w-1/2 bg-slate-100 relative flex flex-col items-center justify-center p-12 overflow-hidden">
           {/* Background browser simulation */}

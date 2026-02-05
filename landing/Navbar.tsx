@@ -7,6 +7,16 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
+  const handleScroll = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   return (
     <nav
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled
@@ -15,6 +25,7 @@ const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
         }`}
     >
       <div className="max-w-6xl mx-auto px-4 md:px-8 flex items-center justify-between">
+        {/* Logo */}
         <div className="flex items-center gap-2">
           <img
             src="/chat-pilot-logo.png"
@@ -24,15 +35,16 @@ const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
           />
         </div>
 
+        {/* Nav links */}
         <div className="hidden md:flex items-center gap-3">
           {[
-            { href: "#how", label: "How it works" },
-            { href: "#services", label: "Services" },
-            { href: "#contact", label: "Contact" },
+            { id: "how", label: "How it works" },
+            { id: "services", label: "Services" },
+            { id: "contact", label: "Contact" },
           ].map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
+            <button
+              key={l.id}
+              onClick={() => handleScroll(l.id)}
               className={
                 "inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-tight transition " +
                 (scrolled
@@ -41,11 +53,9 @@ const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
               }
             >
               {l.label}
-            </a>
+            </button>
           ))}
         </div>
-
-
       </div>
     </nav>
   );

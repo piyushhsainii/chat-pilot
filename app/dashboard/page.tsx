@@ -1,5 +1,6 @@
 "use client";
 
+import BotSelector from "@/components/BotSelector";
 import { Playground } from "@/components/Playground";
 import { useDashboardStore } from "@/store/dashboardStore";
 import Link from "next/link";
@@ -100,89 +101,14 @@ const DashboardPage = () => {
 
         {/* Bot Grid */}
         {bots && bots.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {bots.map((bot) => {
-              const checks = getBotConfigChecks(bot);
-              const progress = getConfigProgress(checks);
-              const configured = isBotFullyConfigured(bot);
-
-              return (
-                <button
-                  key={bot.id}
-                  disabled={!configured}
-                  onClick={() => configured && setSelectedBotId(bot.id)}
-                  className={`relative p-4 rounded-2xl border-2 text-left transition-all
-                    ${!configured
-                      ? "bg-slate-100 border-red-200 cursor-not-allowed opacity-75"
-                      : selectedBotId === bot.id
-                        ? "bg-white border-indigo-500 shadow-md scale-[1.02]"
-                        : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-lg"
-                    }`}
-                >
-                  {/* Config error badge */}
-                  {!configured && (
-                    <Link
-                      href={`/dashboard/bots/${bot.id}/config`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute top-2 right-2 group"
-                    >
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-bold uppercase">
-                        Config Error
-                      </span>
-
-                      {/* Tooltip */}
-                      <div className="absolute z-10 right-0 mt-2 w-56 rounded-xl bg-white border border-slate-200 shadow-lg p-3 opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                        <p className="text-[10px] font-bold text-slate-600 mb-2 uppercase">
-                          Missing configuration
-                        </p>
-                        <ul className="space-y-1">
-                          {checks
-                            .filter((c) => !c.valid)
-                            .map((c) => (
-                              <li
-                                key={c.label}
-                                className="text-[11px] text-red-600"
-                              >
-                                • {c.label}
-                              </li>
-                            ))}
-                        </ul>
-                        <p className="mt-2 text-[10px] text-indigo-600 font-semibold">
-                          Click to fix →
-                        </p>
-                      </div>
-                    </Link>
-                  )}
-
-                  {/* Bot header */}
-                  <p className="text-sm font-bold text-slate-800 mb-1 truncate">
-                    {bot.name}
-                  </p>
-
-                  <span className="text-[9px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold uppercase">
-                    {bot.tone}
-                  </span>
-
-                  {/* Progress bar */}
-                  <div className="mt-4">
-                    <div className="flex justify-between text-[9px] font-semibold text-slate-500 mb-1">
-                      <span>Configuration</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${progress === 100
-                          ? "bg-emerald-500"
-                          : "bg-amber-400"
-                          }`}
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          <BotSelector
+            bots={bots}
+            getBotConfigChecks={getBotConfigChecks}
+            getConfigProgress={getConfigProgress}
+            selectedBotId={selectedBotId}
+            setSelectedBotId={setSelectedBotId}
+            isBotFullyConfigured={isBotFullyConfigured}
+          />
         ) : (
           <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
             <p className="text-slate-500 text-sm">
@@ -193,7 +119,7 @@ const DashboardPage = () => {
 
         {/* Playground */}
         {selectedBot && isBotFullyConfigured(selectedBot) && (
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-lg">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-lg max-w-[1000px]">
             <Playground
               selectedBot={selectedBot}
               credits={credits}

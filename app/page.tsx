@@ -22,21 +22,26 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      setScrolled(window.scrollY > 150);
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative ">
       <Navbar scrolled={scrolled} />
       <main>
         <Hero2 />
-        <HowItWorks />
-        <Benefits />
-        {/* <Testimonials /> */}
-        <FinalCTA />
+        <section id="how">
+          <HowItWorks />
+        </section>
+        <section id="services">
+          <Benefits />
+        </section>
+        <section id="contact">
+          <FinalCTA />
+        </section>
       </main>
       <Footer />
     </div>

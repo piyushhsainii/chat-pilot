@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
+import { Analytics } from "@vercel/analytics/next"
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "/",
+    url: "/chat-pilot-hero.png",
     siteName: "Chat Pilot",
     title: "Chat Pilot",
     description: "Turn your knowledge and tools into reliable assistants.",
@@ -72,9 +72,9 @@ export const metadata: Metadata = {
     images: ["/api/og"],
   },
   icons: {
-    icon: [{ url: "/logo.png", type: "image/png" }],
-    apple: [{ url: "/logo.png", type: "image/png" }],
-    shortcut: ["/logo.png"],
+    icon: [{ url: "/chat-pilot-hero.png", type: "image/png" }],
+    apple: [{ url: "/chat-pilot-hero.png", type: "image/png" }],
+    shortcut: ["/chat-pilot-hero.png"],
   },
 };
 
@@ -86,17 +86,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script
+        {/* <script
           src="https://chat-pilot-agent.vercel.app/widget.js"
           data-bot-id="38fcdfb6-a8b6-44f4-89a2-3c0116df8816"
           defer
-        ></script>
+        ></script> */}
 
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );
