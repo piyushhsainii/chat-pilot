@@ -1,20 +1,7 @@
 "use client";
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  AnimatePresence,
-  motion,
-  useInView,
-  useReducedMotion,
-  useScroll,
-  useTransform,
-} from "framer-motion";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useInView } from "framer-motion";
 import {
   BarChart3,
   Database,
@@ -22,222 +9,199 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+/* ---------------- TYPES ---------------- */
+
 type HowStep = {
   id: string;
-  number: string;
   title: string;
   desc: string;
-  mediaSrc?: string;
-  theme: {
-    bg: string;
-    accent: string;
-    card: string;
-  };
+  mediaSrc: string;
   icon: React.ReactNode;
 };
 
-const DEFAULT_STEPS: HowStep[] = [
+/* ---------------- DATA ---------------- */
+
+const STEPS: HowStep[] = [
   {
-    id: "deploy-bot",
-    number: "01",
+    id: "deploy",
     title: "Setup & Deploy the Bot",
     desc:
-      "Launch the setup bot, answer a few prompts, and it generates your configuration instantly. No manual setup—go from zero to ready-to-install in minutes.",
+      "Launch the setup bot, answer a few prompts, and it generates your configuration instantly.",
     mediaSrc: "/step1.png",
-    theme: {
-      bg: "bg-[radial-gradient(900px_circle_at_30%_20%,rgba(167,243,208,0.55),transparent_55%),radial-gradient(900px_circle_at_80%_80%,rgba(186,230,253,0.55),transparent_55%)]",
-      accent: "#10b981",
-      card: "bg-emerald-50 border-emerald-200",
-    },
-    icon: <Fingerprint className="h-5 w-5" />,
+    icon: <Fingerprint />,
   },
   {
-    id: "connect-tools",
-    number: "02",
+    id: "connect",
     title: "Connect Multiple Tools",
     desc:
-      "Link your favorite tools (CRM, email, analytics, ads, Slack, etc.). The bot auto-detects what you already use and guides you through secure one-click connections.",
+      "Link your CRM, email, analytics, ads, Slack, and more with one-click setup.",
     mediaSrc: "/step2.png",
-    theme: {
-      bg: "bg-[radial-gradient(900px_circle_at_25%_20%,rgba(253,224,71,0.50),transparent_55%),radial-gradient(900px_circle_at_85%_70%,rgba(251,207,232,0.55),transparent_55%)]",
-      accent: "#eab308",
-      card: "bg-amber-50 border-amber-200",
-    },
-    icon: <ShieldCheck className="h-5 w-5" />,
+    icon: <ShieldCheck />,
   },
   {
-    id: "embed-website",
-    number: "03",
+    id: "embed",
     title: "Embed on Your Website",
     desc:
-      "Copy a single snippet (or use a 1-click install) to add the bot to your site. The bot verifies it's live and working in real time—no developer required.",
+      "Drop a single snippet on your site and verify instantly — no developer required.",
     mediaSrc: "/step3.png",
-    theme: {
-      bg: "bg-[radial-gradient(900px_circle_at_25%_15%,rgba(191,219,254,0.65),transparent_55%),radial-gradient(900px_circle_at_90%_85%,rgba(199,210,254,0.60),transparent_55%)]",
-      accent: "#3b82f6",
-      card: "bg-sky-50 border-sky-200",
-    },
-    icon: <Database className="h-5 w-5" />,
+    icon: <Database />,
   },
   {
-    id: "automate",
-    number: "04",
+    id: "track",
     title: "Track Analytics That Drive Growth",
     desc:
-      "See leads, bookings, revenue, and ROAS in one dashboard. Track what converts, prove ROI, and double down on the workflows and channels that generate real results.",
+      "Track leads, bookings, revenue and ROI in one unified dashboard.",
     mediaSrc: "/step4.png",
-    theme: {
-      bg: "bg-[radial-gradient(900px_circle_at_30%_20%,rgba(251,191,36,0.25),transparent_55%),radial-gradient(900px_circle_at_80%_75%,rgba(147,197,253,0.55),transparent_55%)]",
-      accent: "#111827",
-      card: "bg-zinc-50 border-zinc-200",
-    },
-    icon: <BarChart3 className="h-5 w-5" />,
+    icon: <BarChart3 />,
   },
 ];
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
+/* ---------------- STEP ITEM ---------------- */
 
-const StepItem: React.FC<{
+const StepItem = ({
+  step,
+  idx,
+  isActive,
+  onEnterView,
+  scrollTo,
+  setRef,
+}: {
   step: HowStep;
   idx: number;
   isActive: boolean;
-  onActivate: (idx: number) => void;
-  onSelect: (idx: number) => void;
-  registerRef: (idx: number, node: HTMLDivElement | null) => void;
-}> = ({ step, idx, isActive, onActivate, onSelect, registerRef }) => {
+  onEnterView: (idx: number) => void;
+  scrollTo: (idx: number) => void;
+  setRef: (el: HTMLDivElement | null) => void;
+}) => {
   const ref = useRef<HTMLDivElement | null>(null);
 
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start center", "center center"],
-  });
-
-  // Height grows ONLY for active step
-  const animatedHeight = useTransform(
-    scrollYProgress,
-    [0, 0.5, 1],
-    [0, 115, 120]
-  );
-
   const inView = useInView(ref, {
-    margin: "-50% 0px -50% 0px",
+    margin: "-45% 0px -45% 0px",
+    amount: 0.5,
   });
 
   useEffect(() => {
-    if (inView) onActivate(idx);
-  }, [idx, inView, onActivate]);
+    if (inView) onEnterView(idx);
+  }, [inView, idx, onEnterView]);
 
   return (
     <div
-      ref={(node) => {
-        ref.current = node;
-        registerRef(idx, node);
+      ref={(el) => {
+        ref.current = el;
+        setRef(el);
       }}
-      className="relative"
     >
-      <motion.button
-        type="button"
-        onClick={() => onSelect(idx)}
-        className="group w-full text-left"
-      >
-        <h3
-          className={`text-xl pt-2 md:text-2xl transition-colors ${isActive ? "text-slate-900" : "text-slate-400"
-            }`}
-        >
-          {step.title}
-        </h3>
+      <button onClick={() => scrollTo(idx)} className="w-full text-left">
+        {/* Header */}
+        <div className="flex items-start gap-4 py-6">
+          <motion.span
+            animate={{ rotate: isActive ? 0 : 90 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="text-3xl font-light text-slate-500 leading-none"
+          >
+            {isActive ? "−" : "+"}
+          </motion.span>
+
+          <h3
+            className={`text-xl md:text-2xl transition-colors ${isActive ? "text-slate-900" : "text-slate-400"
+              }`}
+          >
+            {step.title}
+          </h3>
+        </div>
 
         {/* Description */}
-        <motion.div
-          style={{ height: isActive ? animatedHeight : 0 }}
-          className="overflow-hidden"
-        >
-          <p className="text-sm md:text-base text-slate-600 leading-relaxed max-w-[48ch] pt-2">
-            {step.desc}
-          </p>
-        </motion.div>
-
-        {idx < DEFAULT_STEPS.length - 1 && (
-          <div className="pt-8 mt-8 border-b border-slate-200" />
-        )}
-      </motion.button>
-    </div>
-  );
-};
-
-const VisualPanel: React.FC<{ step: HowStep }> = ({ step }) => {
-  return (
-    <div className="rounded-3xl border bg-white/80 p-4 shadow-xl backdrop-blur mt-14">
-      <div className={`rounded-2xl p-6 ${step.theme.bg}`}>
-        <AnimatePresence mode="wait">
-          <motion.img
-            key={step.id}
-            src={step.mediaSrc}
-            alt={step.title}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.35 }}
-            className="max-h-96 mx-auto object-contain mt-10"
-          />
+        <AnimatePresence initial={false}>
+          {isActive && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="pb-6">
+                <p className="text-slate-600 max-w-[46ch] leading-relaxed">
+                  {step.desc}
+                </p>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
-      </div>
+
+        <div className="border-b border-slate-200" />
+      </button>
     </div>
   );
 };
 
-const HowItWorks: React.FC = () => {
-  const [activeStep, setActiveStep] = useState(0);
-  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const isManualScrolling = useRef(false);
+/* ---------------- VISUAL PANEL ---------------- */
 
-  const active = useMemo(
-    () => DEFAULT_STEPS[clamp(activeStep, 0, DEFAULT_STEPS.length - 1)],
-    [activeStep]
+const VisualPanel = ({ step }: { step: HowStep }) => {
+  return (
+    <div className="sticky top-24 h-[520px] rounded-3xl border bg-white shadow-xl overflow-hidden">
+      <AnimatePresence mode="wait">
+        <motion.img
+          key={step.id}
+          src={step.mediaSrc}
+          alt={step.title}
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.97 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="w-full h-full object-contain"
+        />
+      </AnimatePresence>
+    </div>
   );
+};
 
-  const registerStepRef = useCallback((idx: any, node: any) => {
-    stepRefs.current[idx] = node;
+/* ---------------- MAIN ---------------- */
+
+const HowItWorks = () => {
+  const [activeStep, setActiveStep] = useState(0);
+  const refs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const active = useMemo(() => STEPS[activeStep], [activeStep]);
+
+  // 🔑 Scroll decides active step
+  const onEnterView = useCallback((idx: number) => {
+    setActiveStep((prev) => (prev === idx ? prev : idx));
   }, []);
 
-  const setActiveFromScroll = useCallback((idx: any) => {
-    if (!isManualScrolling.current) setActiveStep(idx);
-  }, []);
-
-  const scrollTo = useCallback((idx: any) => {
-    const el = stepRefs.current[idx];
+  // 🔑 Click only scrolls
+  const scrollTo = useCallback((idx: number) => {
+    const el = refs.current[idx];
     if (!el) return;
 
-    isManualScrolling.current = true;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const y =
+      window.scrollY +
+      el.getBoundingClientRect().top -
+      window.innerHeight * 0.35;
 
-    setTimeout(() => {
-      isManualScrolling.current = false;
-    }, 600);
+    window.scrollTo({ top: y, behavior: "smooth" });
   }, []);
 
   return (
     <section className="py-24 bg-gradient-to-b from-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16">
+        {/* LEFT */}
         <div>
-          {DEFAULT_STEPS.map((s, idx) => (
+          {STEPS.map((step, idx) => (
             <StepItem
-              key={s.id}
-              step={s}
+              key={step.id}
+              step={step}
               idx={idx}
               isActive={idx === activeStep}
-              onActivate={setActiveFromScroll}
-              onSelect={scrollTo}
-              registerRef={registerStepRef}
+              onEnterView={onEnterView}
+              scrollTo={scrollTo}
+              setRef={(el) => (refs.current[idx] = el)}
             />
           ))}
         </div>
 
-        <div className="lg:sticky lg:top-24">
-          <VisualPanel step={active} />
-        </div>
+        {/* RIGHT */}
+        <VisualPanel step={active} />
       </div>
     </section>
   );

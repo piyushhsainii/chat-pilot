@@ -16,14 +16,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const ogImage = `${siteUrl}/chat-pilot-hero.png`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+
   applicationName: "Chat Pilot",
+
   title: {
-    default: "Chat Pilot",
+    default: "Chat Pilot – Build Reliable AI Assistants",
     template: "%s | Chat Pilot",
   },
-  description: "Turn your knowledge and tools into reliable assistants.",
+
+  description:
+    "Chat Pilot lets you turn your knowledge, tools, and workflows into reliable AI assistants with analytics and control.",
+
+  keywords: [
+    "Chat Pilot",
+    "AI agents",
+    "AI assistants",
+    "customer support AI",
+    "knowledge base AI",
+    "chat widget",
+    "AI analytics",
+  ],
+
   robots: {
     index: true,
     follow: true,
@@ -35,46 +52,49 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
+
   referrer: "origin-when-cross-origin",
+
   formatDetection: {
     telephone: false,
     address: false,
     email: false,
   },
-  keywords: [
-    "Chat Pilot",
-    "AI agent",
-    "customer support",
-    "knowledge base",
-    "chat widget",
-    "analytics",
-  ],
+
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "/chat-pilot-hero.png",
+    url: siteUrl,
     siteName: "Chat Pilot",
-    title: "Chat Pilot",
-    description: "Turn your knowledge and tools into reliable assistants.",
+    title: "Chat Pilot – Build Reliable AI Assistants",
+    description:
+      "Turn your knowledge and tools into reliable AI assistants with Chat Pilot.",
     images: [
       {
-        url: "/api/og",
+        url: ogImage,
         width: 1200,
         height: 630,
-        alt: "Chat Pilot",
+        alt: "Chat Pilot – AI Assistants Platform",
       },
     ],
   },
+
   twitter: {
     card: "summary_large_image",
-    title: "Chat Pilot",
-    description: "Turn your knowledge and tools into reliable assistants.",
-    images: ["/api/og"],
+    site: "@chatpilot", // optional
+    title: "Chat Pilot – Build Reliable AI Assistants",
+    description:
+      "Turn your knowledge and tools into reliable AI assistants with Chat Pilot.",
+    images: [ogImage],
   },
+
   icons: {
-    icon: [{ url: "/chat-pilot-hero.png", type: "image/png" }],
-    apple: [{ url: "/chat-pilot-hero.png", type: "image/png" }],
-    shortcut: ["/chat-pilot-hero.png"],
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    shortcut: ["/favicon.ico"],
   },
 };
 
@@ -85,15 +105,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-
       <head>
         <meta name="google-site-verification" content="NyaInzo49We9F1XvJlyGk4nKfW4LcdAwBp9iOogBm0A" />
-        {/* <script
-          src="https://chat-pilot-agent.vercel.app/widget.js"
-          data-bot-id="38fcdfb6-a8b6-44f4-89a2-3c0116df8816"
-          defer
-        ></script> */}
-
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}

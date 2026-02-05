@@ -9,7 +9,10 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
   const handleScroll = (id: string) => {
     const el = document.getElementById(id);
-    if (!el) return;
+    if (!el) {
+      window.location.href = `/#${id}`;
+      return;
+    }
 
     el.scrollIntoView({
       behavior: "smooth",

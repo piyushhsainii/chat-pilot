@@ -102,12 +102,12 @@ const Footer: React.FC = () => {
             </h5>
             <ul className="mt-5 space-y-3 text-sm text-zinc-300">
               <li>
-                <a href="#" className="hover:text-white transition">
+                <a href="/privacy-policy" className="hover:text-white transition">
                   Privacy
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition">
+                <a href="/terms-of-service" className="hover:text-white transition">
                   Terms
                 </a>
               </li>

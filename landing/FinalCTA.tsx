@@ -1,6 +1,7 @@
 
 import Link from "next/link";
 import React from "react";
+import PrimaryCTA from "@/landing/PrimaryCTA";
 
 const FinalCTA: React.FC = () => {
   return (
@@ -22,12 +23,11 @@ const FinalCTA: React.FC = () => {
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/dashboard"
+              <PrimaryCTA
                 className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 transition"
-              >
-                Build your agent
-              </Link>
+                textBuild="Build your agent"
+                textWaitlist="Join waitlist"
+              />
               <Link
                 href="/login"
                 className="inline-flex items-center justify-center rounded-full border border-white/15 bg-transparent px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/5 transition"
