@@ -85,7 +85,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+
       <head>
+        <meta name="google-site-verification" content="NyaInzo49We9F1XvJlyGk4nKfW4LcdAwBp9iOogBm0A" />
         {/* <script
           src="https://chat-pilot-agent.vercel.app/widget.js"
           data-bot-id="38fcdfb6-a8b6-44f4-89a2-3c0116df8816"
