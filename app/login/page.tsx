@@ -108,14 +108,14 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
 
             <div className="mb-10">
               <img
-                src="/logo2.png"
+                src="/chat-pilot-logo.png"
                 alt="Chatbase"
-                className="w-12 h-12 object-contain mb-6"
+                className="w-16 h-16 object-contain mb-6"
               />
-              <h1 className="text-4xl text-slate-900 font-normal mb-4 tracking-tighter">
+              <h1 className="text-4xl text-slate-900 font-light font-sans mb-4 tracking-tighter">
                 Log in
               </h1>
-              <p className="text-slate-500 text-lg leading-relaxed max-w-xs tracking-tight">
+              <p className="text-slate-500 text-lg leading-relaxed max-w-xs tracking-wide">
                 Welcome back! Sign in to continue building your custom AI
                 agents.
               </p>
@@ -125,7 +125,7 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
               <button
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-4 px-8 py-4 bg-white border-2 border-slate-100 rounded-2xl hover:bg-slate-50 hover:border-slate-200 transition-all font-bold text-slate-800 shadow-sm group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center cursor-pointer justify-center gap-4 px-8 py-4 bg-white border-2 border-slate-100 rounded-2xl hover:bg-slate-50 hover:border-slate-200 transition-all font-bold text-slate-800 shadow-sm group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <svg
@@ -157,16 +157,15 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                 )}
                 <span>Sign in with Google</span>
               </button>
-              <p className="text-center text-slate-400 text-xs mt-4">
-                By signing in, you agree to our{" "}
-                <a href="#" className="underline">
+              <p className="text-center text-slate-400 text-xs mt-4 flex gap-1 ml-10">
+                By signing in, you agree to our
+                <a href="/terms-of-service" className="underline">
                   Terms
-                </a>{" "}
-                and{" "}
-                <a href="#" className="underline">
+                </a>
+                and
+                <a href="/privacy-policy" className="underline">
                   Privacy Policy
                 </a>
-                .
               </p>
             </div>
           </div>
@@ -187,17 +186,13 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
             {/* Visual Component */}
             <div className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl border-4 border-white mb-12 animate-float">
               <img
-                src="https://picsum.photos/seed/dashboard/800/600"
+                src="/Hero-final-illustration.png"
                 alt="Platform Preview"
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-transparent"></div>
               {/* Play button overlay representation */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 bg-white/30 backdrop-blur rounded-full flex items-center justify-center border border-white/40">
-                  <div className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[14px] border-l-white border-b-[8px] border-b-transparent ml-1"></div>
-                </div>
-              </div>
+
             </div>
 
             {/* Testimonials Carousel (Toggleable) */}

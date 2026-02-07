@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       theme: (bot.widgets?.theme as any) ?? null,
       primary_color: bot.widgets?.primary_color ?? null,
       button_color: bot.widgets?.button_color ?? null,
-      text_color: (bot.widgets as any)?.text_color ?? null,
+      text_color: bot.widgets?.text_color ?? null,
       greeting_message: bot.widgets?.greeting_message ?? null,
     },
   };

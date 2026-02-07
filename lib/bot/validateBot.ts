@@ -17,7 +17,8 @@ export async function validateBot(botId: string, referer?: string | null) {
         greeting_message,
         theme,
         primary_color,
-        button_color
+        button_color,
+        text_color
       ),
       bot_settings (
         allowed_domains

@@ -57,6 +57,7 @@ export type Database = {
       }
       bots: {
         Row: {
+          avatar_url: string | null
           created_at: string | null
           fallback_behavior: string | null
           id: string
@@ -67,6 +68,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string | null
           fallback_behavior?: string | null
           id?: string
@@ -77,6 +79,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string | null
           fallback_behavior?: string | null
           id?: string
@@ -384,6 +387,7 @@ export type Database = {
           greeting_message: string | null
           id: string
           primary_color: string | null
+          text_color: string | null
           theme: string | null
           title: string | null
         }
@@ -394,6 +398,7 @@ export type Database = {
           greeting_message?: string | null
           id?: string
           primary_color?: string | null
+          text_color?: string | null
           theme?: string | null
           title?: string | null
         }
@@ -404,6 +409,7 @@ export type Database = {
           greeting_message?: string | null
           id?: string
           primary_color?: string | null
+          text_color?: string | null
           theme?: string | null
           title?: string | null
         }

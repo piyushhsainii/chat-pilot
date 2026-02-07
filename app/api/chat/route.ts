@@ -9,7 +9,11 @@ import { checkRateLimit } from "@/lib/checkrateLimit";
 import { buildBotTools } from "@/lib/tools/buildBotTools";
 
 export async function POST(req: NextRequest) {
-  const { botId, message, history, testMode } = await req.json();
+  const body = await req.json().catch(() => null);
+  const botId = body?.botId;
+  const message = body?.message ?? body?.query;
+  const history = body?.history;
+  const testMode = body?.testMode;
 
   if (!botId || !message) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
@@ -19,7 +23,9 @@ export async function POST(req: NextRequest) {
 
   const { data: bot, error: botError } = await supabase
     .from("bots" as any)
-    .select("id, name, owner_id, tone, model, fallback_behavior, system_prompt")
+    .select(
+      "id, name, owner_id, tone, model, fallback_behavior, system_prompt, avatar_url",
+    )
     .eq("id", botId)
     .single();
 

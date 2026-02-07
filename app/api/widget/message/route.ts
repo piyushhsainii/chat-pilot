@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { streamText, generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { buildKnowledgeContextForQuery } from "@/lib/knowledge/buildKnowledgeContextForQuery";
 import { consumeCreditsForOwner, getOwnerCreditsPrivileged } from "@/lib/billing/credits";
 import { insertChatLog } from "@/lib/analytics/chatLogs";
-import { checkRateLimit } from "@/lib/checkrateLimit";
 import { buildBotTools } from "@/lib/tools/buildBotTools";
 
 type WidgetMessageBody = {
+  botId?: string;
+  bot_id?: string;
   session_id?: string;
   sessionId?: string;
   message?: string;
@@ -17,16 +18,73 @@ type WidgetMessageBody = {
   testMode?: boolean;
 };
 
+type RateLimitRow = {
+  id: string;
+  bot_id: string;
+  ip: string;
+  count: number;
+  window_start: string;
+};
+
+async function checkRateLimitWithAdmin(
+  admin: ReturnType<typeof createAdminClient>,
+  botId: string,
+  ip: string,
+  limit: number,
+): Promise<boolean> {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - 60_000);
+
+  const { data } = await admin
+    .from("rate_limits")
+    .select("*")
+    .eq("bot_id", botId)
+    .eq("ip", ip)
+    .maybeSingle<RateLimitRow>();
+
+  if (!data) {
+    await admin.from("rate_limits").insert({
+      bot_id: botId,
+      ip,
+      count: 1,
+      window_start: now.toISOString(),
+    });
+    return true;
+  }
+
+  const currentWindowStart = new Date(data.window_start);
+
+  if (currentWindowStart < windowStart) {
+    await admin
+      .from("rate_limits")
+      .update({ count: 1, window_start: now.toISOString() })
+      .eq("id", data.id);
+    return true;
+  }
+
+  if (data.count >= limit) return false;
+
+  await admin
+    .from("rate_limits")
+    .update({ count: data.count + 1 })
+    .eq("id", data.id);
+
+  return true;
+}
+
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as WidgetMessageBody | null;
 
+  const urlBotId = req.nextUrl.searchParams.get("botId") || req.nextUrl.searchParams.get("bot_id");
+
   const session_id = body?.session_id ?? body?.sessionId;
+  const bodyBotId = body?.botId ?? body?.bot_id ?? urlBotId ?? undefined;
   const message = body?.message;
   const history = body?.history;
   const stream = Boolean(body?.stream);
   const testMode = Boolean(body?.testMode);
 
-  if (!session_id || !message) {
+  if (!message || (!session_id && !bodyBotId)) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
@@ -35,35 +93,64 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-real-ip") ||
     "unknown";
 
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  // 1. Validate session
-  const { data: session } = await supabase
-    .from("chat_sessions")
-    .select("bot_id, user_id")
-    .eq("id", session_id)
-    .single();
+  // 1) Resolve bot_id (prefer session, fallback to explicit botId)
+  let resolvedSessionId = session_id || null;
+  let resolvedBotId: string | null = null;
 
-  if (!session) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+  if (resolvedSessionId) {
+    const { data: session } = await admin
+      .from("chat_sessions")
+      .select("id, bot_id")
+      .eq("id", resolvedSessionId)
+      .maybeSingle();
+
+    if (session?.bot_id) {
+      resolvedBotId = String(session.bot_id);
+    } else {
+      // Session missing/expired; fall back to botId from the widget script.
+      resolvedSessionId = null;
+    }
   }
 
+  if (!resolvedBotId && bodyBotId) {
+    resolvedBotId = String(bodyBotId);
+
+    // Create an anonymous session if client didn't provide one.
+    const { data: created } = await admin
+      .from("chat_sessions")
+      .insert({ bot_id: resolvedBotId, is_anonymous: true })
+      .select("id")
+      .single();
+
+    resolvedSessionId = created?.id ?? null;
+  }
+
+  if (!resolvedBotId) {
+    return NextResponse.json({ error: "Bot not found" }, { status: 404 });
+  }
+
+  const sessionHeader: Record<string, string> = resolvedSessionId
+    ? { "x-chatpilot-session-id": resolvedSessionId }
+    : {};
+
   // 2. Load bot + settings
-  const { data: bot } = await supabase
+  const { data: bot } = await admin
     .from("bots")
     .select("id, name, owner_id, tone, model, system_prompt, fallback_behavior")
-    .eq("id", session.bot_id)
+    .eq("id", resolvedBotId)
     .single();
 
-  const { data: settings } = await supabase
+  const { data: settings } = await admin
     .from("bot_settings" as any)
     .select("rate_limit, rate_limit_hit_message")
-    .eq("bot_id", session.bot_id)
+    .eq("bot_id", resolvedBotId)
     .maybeSingle();
 
   if (!testMode) {
     const rateLimit = (settings as any)?.rate_limit ?? 20;
-    const allowed = await checkRateLimit(session.bot_id, ip, rateLimit);
+    const allowed = await checkRateLimitWithAdmin(admin, resolvedBotId, ip, rateLimit);
     if (!allowed) {
       const hitMessage =
         (settings as any)?.rate_limit_hit_message ||
@@ -87,6 +174,7 @@ export async function POST(req: NextRequest) {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
+            ...sessionHeader,
           },
         });
       }
@@ -96,65 +184,67 @@ export async function POST(req: NextRequest) {
           role: "assistant",
           content: hitMessage,
         },
-        { status: 429 },
+        { status: 429, headers: sessionHeader },
       );
     }
   }
 
   const ownerId = (bot as any)?.owner_id as string | undefined;
-  if (!ownerId) {
-    return NextResponse.json({ error: "Bot owner not found" }, { status: 400 });
-  }
 
-  const ownerBalance = await getOwnerCreditsPrivileged(ownerId);
-  if (ownerBalance !== null && ownerBalance <= 0) {
-    const hitMessage = "This agent is temporarily unavailable (no credits).";
+  // If owner_id is missing (older rows / imported bots), don't hard-fail widget chat.
+  // We simply skip credit gating/charging.
+  if (ownerId) {
+    const ownerBalance = await getOwnerCreditsPrivileged(ownerId);
+    if (ownerBalance !== null && ownerBalance <= 0) {
+      const hitMessage = "This agent is temporarily unavailable (no credits).";
 
-    if (stream) {
-      const encoder = new TextEncoder();
-      const noCreditsStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ content: hitMessage })}\n\n`),
-          );
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        },
-      });
+      if (stream) {
+        const encoder = new TextEncoder();
+        const noCreditsStream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ content: hitMessage })}\n\n`),
+            );
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
 
-      return new Response(noCreditsStream, {
-        status: 402,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
+        return new Response(noCreditsStream, {
+          status: 402,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            ...sessionHeader,
+          },
+        });
+      }
+
+      return NextResponse.json(
+        { role: "assistant", content: hitMessage },
+        { status: 402, headers: sessionHeader },
+      );
     }
-
-    return NextResponse.json(
-      { role: "assistant", content: hitMessage },
-      { status: 402 },
-    );
   }
 
   // 3. Load knowledge
-  const { data: sources } = await supabase
+  const { data: sources } = await admin
     .from("knowledge_sources" as any)
     .select("name, type, status, doc_url")
-    .eq("bot_id", session.bot_id)
+    .eq("bot_id", resolvedBotId)
     .neq("status", "failed")
     .order("created_at", { ascending: false });
 
-  const { contextText } = await buildKnowledgeContextForQuery(supabase as any, {
-    botId: session.bot_id,
+  const { contextText } = await buildKnowledgeContextForQuery(admin as any, {
+    botId: resolvedBotId,
     query: String(message),
     sources: ((sources as any[]) ?? []) as any,
   });
 
   const appsUsed = new Set<string>();
   const { tools, toolInstruction } = await buildBotTools({
-    botId: session.bot_id,
+    botId: resolvedBotId,
     testMode,
     requestIp: ip,
     onToolUsed: (evt) => {
@@ -206,25 +296,38 @@ Rules:
       tools: Object.keys(tools).length ? tools : undefined,
     });
 
-    if (!testMode) {
+    if (!testMode && ownerId) {
       await Promise.allSettled([
         insertChatLog({
-          botId: session.bot_id,
+          botId: resolvedBotId,
           question: String(message),
           answer: text,
           environment: "widget",
-          metadata: { session_id, ip, apps_used: Array.from(appsUsed) },
+          metadata: { session_id: resolvedSessionId, ip, apps_used: Array.from(appsUsed) },
         }),
         consumeCreditsForOwner({
           ownerId,
-          botId: session.bot_id,
+          botId: resolvedBotId,
           amount: 1,
           reason: "widget_message",
         }),
       ]);
+    } else if (!testMode) {
+      await Promise.allSettled([
+        insertChatLog({
+          botId: resolvedBotId,
+          question: String(message),
+          answer: text,
+          environment: "widget",
+          metadata: { session_id: resolvedSessionId, ip, apps_used: Array.from(appsUsed) },
+        }),
+      ]);
     }
 
-    return NextResponse.json({ role: "assistant", content: text });
+    return NextResponse.json(
+      { role: "assistant", content: text },
+      { headers: sessionHeader },
+    );
   }
 
   const result = await streamText({
@@ -242,21 +345,43 @@ Rules:
     finalized = true;
     if (testMode) return;
 
-    await Promise.allSettled([
-      insertChatLog({
-        botId: session.bot_id,
-        question: String(message),
-        answer: fullAnswer,
-        environment: "widget_stream",
-        metadata: { session_id, ip, apps_used: Array.from(appsUsed), ...(meta ?? {}) },
-      }),
-      consumeCreditsForOwner({
-        ownerId,
-        botId: session.bot_id,
-        amount: 1,
-        reason: "widget_message_stream",
-      }),
-    ]);
+    await Promise.allSettled(
+      ownerId
+        ? [
+            insertChatLog({
+              botId: resolvedBotId,
+              question: String(message),
+              answer: fullAnswer,
+              environment: "widget_stream",
+              metadata: {
+                session_id: resolvedSessionId,
+                ip,
+                apps_used: Array.from(appsUsed),
+                ...(meta ?? {}),
+              },
+            }),
+            consumeCreditsForOwner({
+              ownerId,
+              botId: resolvedBotId,
+              amount: 1,
+              reason: "widget_message_stream",
+            }),
+          ]
+        : [
+            insertChatLog({
+              botId: resolvedBotId,
+              question: String(message),
+              answer: fullAnswer,
+              environment: "widget_stream",
+              metadata: {
+                session_id: resolvedSessionId,
+                ip,
+                apps_used: Array.from(appsUsed),
+                ...(meta ?? {}),
+              },
+            }),
+          ],
+    );
   };
 
   const streamBody = new ReadableStream({
@@ -290,6 +415,7 @@ Rules:
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...sessionHeader,
     },
   });
 }

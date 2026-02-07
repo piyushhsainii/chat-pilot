@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   // 1. Load bot
   const { data: bot } = await supabase
     .from("bots")
-    .select("id, name, owner_id, tone")
+    .select("id, name, owner_id, tone, avatar_url")
     .eq("id", botId)
     .single();
   if (!bot) {
@@ -54,6 +54,7 @@ export async function GET(req: Request) {
       id: bot.id,
       name: bot.name,
       tone: (bot as any)?.tone ?? null,
+      avatar_url: (bot as any)?.avatar_url ?? null,
     },
     widget: {
       title: widget?.title ?? "AI Assistant",
@@ -61,7 +62,7 @@ export async function GET(req: Request) {
       theme: widget?.theme,
       primary_color: widget?.primary_color,
       button_color: widget?.button_color,
-      text_color: (widget as any)?.text_color,
+      text_color: widget?.text_color,
     },
     limits: {
       rate_limit: settings?.rate_limit ?? 60,

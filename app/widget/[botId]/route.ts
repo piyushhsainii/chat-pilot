@@ -18,7 +18,7 @@ export async function GET(
     name: bot.widgets?.title || bot.name,
     theme: (bot.widgets?.theme as "light" | "dark") || "light",
     primary: bot.widgets?.primary_color || "",
-    textColor: (bot.widgets as any)?.text_color || "ffffff",
+    textColor: bot.widgets?.text_color || "ffffff",
     embedded: false,
     welcomeMessage: bot.widgets?.greeting_message || "Hi! How can I help you?",
   });

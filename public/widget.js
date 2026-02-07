@@ -36,9 +36,22 @@
 
   if (__cp_isEmbeddedContext) return;
 
+  // Capture the exact <script> element that loaded widget.js.
+  // This is the most reliable way to read data-* attributes like data-bot-id.
+  const __cp_loaderScript = (() => {
+    try {
+      const s = document.currentScript;
+      if (s && s.tagName === "SCRIPT") return s;
+    } catch {
+      // ignore
+    }
+    return null;
+  })();
+
   class ChatPilotWidget {
     constructor() {
       this.hasRemoteConfig = false;
+      this.loaderScript = __cp_loaderScript;
       this.config = this.extractConfig();
 
       console.log("[ChatPilot] Config extracted:", this.config);
@@ -53,17 +66,19 @@
     }
 
     extractConfig() {
+      const DEFAULT_BASE_URL = "http://localhost:3000";
+      // const DEFAULT_BASE_URL = "https://www.chatpilot-agent.com";
+
       // Preferred: config injected via /api/widget/chat
       if (window.__CHAT_WIDGET__ && window.__CHAT_WIDGET__.botId) {
         const cfg = window.__CHAT_WIDGET__;
         const widgetScript = document.querySelector("script[src*='widget.js']");
         const inferredBaseUrl = (() => {
-          if (!widgetScript?.src) return "https://chat-pilot-agent.vercel.app";
+          if (!widgetScript?.src) return DEFAULT_BASE_URL;
           const u = new URL(widgetScript.src, window.location.href);
           // If the script is served from the host site (relative path),
           // do NOT treat that as the API origin.
-          if (u.origin === window.location.origin)
-            return "https://chat-pilot-agent.vercel.app";
+          if (u.origin === window.location.origin) return DEFAULT_BASE_URL;
           return u.origin;
         })();
         return {
@@ -82,7 +97,27 @@
       const allScripts = document.querySelectorAll("script");
       console.log("[ChatPilot] Total scripts found:", allScripts.length);
 
-      const script = document.querySelector("script[data-bot-id]");
+      // 1) Best: the script tag that loaded widget.js (document.currentScript).
+      // 2) Next: a script tag with BOTH data-bot-id and a widget.js src.
+      // 3) Fallback: any script tag with data-bot-id.
+      const script = (() => {
+        try {
+          const loader = this.loaderScript;
+          if (loader?.getAttribute?.("data-bot-id")) return loader;
+
+          const scriptsWithBotId = Array.from(
+            document.querySelectorAll("script[data-bot-id]"),
+          );
+          const preferred = scriptsWithBotId.find((s) => {
+            const src = String(s.getAttribute("src") || "");
+            return src.includes("widget.js");
+          });
+
+          return preferred || scriptsWithBotId[0] || null;
+        } catch {
+          return null;
+        }
+      })();
       console.log("[ChatPilot] Script with data-bot-id:", script);
 
       if (!script) {
@@ -100,8 +135,7 @@
             return {
               botId,
               baseUrl:
-                widgetScript.getAttribute("data-base-url") ||
-                "https://chat-pilot-agent.vercel.app",
+                widgetScript.getAttribute("data-base-url") || DEFAULT_BASE_URL,
               theme: widgetScript.getAttribute("data-theme") || "light",
               primary: widgetScript.getAttribute("data-primary"),
               buttonColor: widgetScript.getAttribute("data-button") || null,
@@ -138,7 +172,7 @@
         baseUrl:
           script.getAttribute("data-base-url") ||
           baseUrlFromSrc ||
-          "https://chat-pilot-agent.vercel.app",
+          DEFAULT_BASE_URL,
         theme: script.getAttribute("data-theme") || "light",
         primary: script.getAttribute("data-primary"),
         buttonColor: script.getAttribute("data-button") || null,

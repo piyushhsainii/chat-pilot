@@ -17,6 +17,7 @@ function WidgetChatContent() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isFocused, setIsFocused] = useState(false);
+    const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const toCssColor = (value: any, fallback: string) => {
@@ -262,6 +263,13 @@ function WidgetChatContent() {
             return;
         }
 
+        const botIdForApi =
+            botId
+            || config?.bot?.id
+            || config?.botId
+            || config?.bot_id
+            || null;
+
         const trimmedText = text.trim();
 
         const historyForApi = messages
@@ -307,6 +315,8 @@ function WidgetChatContent() {
                     "Accept": "text/event-stream",
                 },
                 body: JSON.stringify({
+                    botId: botIdForApi,
+                    bot_id: botIdForApi,
                     session_id: sessionId,
                     sessionId: sessionId, // Support both formats
                     message: trimmedText,
@@ -315,15 +325,16 @@ function WidgetChatContent() {
                 }),
             });
 
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error("[Widget] Message API failed:", res.status, errorText);
-                throw new Error(`Failed to send message: ${res.status}`);
+            // Server may rotate/repair sessions; keep client in sync.
+            const nextSessionId = res.headers.get("x-chatpilot-session-id");
+            if (nextSessionId && nextSessionId !== sessionId) {
+                setSessionId(nextSessionId);
             }
 
             const contentType = res.headers.get("content-type") || "";
+            const isSse = contentType.includes("text/event-stream") && Boolean(res.body);
 
-            if (contentType.includes("text/event-stream") && res.body) {
+            if (isSse && res.body) {
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = "";
@@ -367,8 +378,18 @@ function WidgetChatContent() {
 
                 // If the stream ended without [DONE]
                 setMessages((prev) => prev.map((m) => m.id === assistantMessageId ? ({ ...m, streaming: false }) : m));
+                if (!res.ok) {
+                    console.warn("[Widget] Message stream returned non-OK:", res.status);
+                    setError(`Message failed: ${res.status}`);
+                }
             } else {
-                const data = await res.json();
+                const raw = await res.text().catch(() => "");
+                let data: any = null;
+                try {
+                    data = raw ? JSON.parse(raw) : null;
+                } catch {
+                    data = { error: raw || null };
+                }
                 console.log("[Widget] Message response:", data);
 
                 const content =
@@ -376,13 +397,19 @@ function WidgetChatContent() {
                     data?.message ||
                     data?.response ||
                     data?.text ||
+                    data?.error ||
                     (typeof data === "string" ? data : JSON.stringify(data));
 
                 setMessages((prev) => prev.map((m) =>
                     m.id === assistantMessageId
-                        ? ({ ...m, content: String(content || ""), streaming: false })
+                        ? ({ ...m, content: String(content || ""), streaming: false, isError: !res.ok })
                         : m
                 ));
+
+                if (!res.ok) {
+                    console.error("[Widget] Message API failed:", res.status, data);
+                    setError(`Message failed: ${res.status}`);
+                }
             }
         } catch (err) {
             console.error("[Widget] Send message error:", err);
@@ -430,6 +457,21 @@ function WidgetChatContent() {
 
     const botTone = config?.bot?.tone ?? config?.tone ?? null;
     const toneSuggestions = getToneSuggestions(botTone, botName);
+
+    const botAvatarUrlRaw =
+        config?.widget?.pfp
+        || config?.widget?.avatar_url
+        || config?.widget?.avatarUrl
+        || config?.bot?.avatar_url
+        || config?.bot?.avatarUrl
+        || config?.avatar_url
+        || config?.avatarUrl
+        || null;
+
+    const botAvatarUrl =
+        !avatarLoadFailed && typeof botAvatarUrlRaw === "string" && botAvatarUrlRaw.trim().length > 0
+            ? botAvatarUrlRaw.trim()
+            : null;
 
     // Log colors for debugging
     console.log("[Widget] Colors configured:", { primaryCss, textCss, theme, botName, botTone });
@@ -512,6 +554,14 @@ function WidgetChatContent() {
 
     // Embedded mode (inside iframe)
     if (embedded) {
+        const userBubbleClass =
+            "p-4 rounded-2xl rounded-tr-none text-sm font-medium shadow-lg transition-all duration-300 max-w-[80%] tracking-tighter";
+        const botBubbleClass = userBubbleClass.replace(
+            "rounded-tr-none",
+            "rounded-tl-none",
+        );
+        const errorBubbleClass = botBubbleClass;
+
         const embeddedStyles = {
             container: {
                 width: "100%",
@@ -542,6 +592,7 @@ function WidgetChatContent() {
                 height: "40px",
                 borderRadius: "12px",
                 backgroundColor: theme === "dark" ? "#1e293b" : "#f1f5f9",
+                overflow: "hidden",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -597,52 +648,12 @@ function WidgetChatContent() {
                 justifyContent: "flex-end",
                 animation: "slideIn 0.3s ease-out",
             },
-            messageBubbleBot: {
-                padding: "10px 14px",
-                borderRadius: "14px",
-                borderTopLeftRadius: "4px",
-                fontSize: "14px",
-                lineHeight: "1.5",
-                maxWidth: "85%",
-                backgroundColor: theme === "dark" ? "#1e293b" : "#f1f5f9",
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                letterSpacing: "-0.01em",
-                wordWrap: "break-word" as const,
-                whiteSpace: "pre-wrap" as const,
-            },
-            messageBubbleUser: {
-                padding: "10px 14px",
-                borderRadius: "14px",
-                borderTopRightRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
-                maxWidth: "80%",
-                backgroundColor: primaryCss,
-                color: textCss,
-                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                letterSpacing: "-0.01em",
-                wordWrap: "break-word" as const,
-                whiteSpace: "pre-wrap" as const,
-            },
-            messageBubbleError: {
-                padding: "10px 14px",
-                borderRadius: "14px",
-                borderTopLeftRadius: "4px",
-                fontSize: "14px",
-                lineHeight: "1.5",
-                maxWidth: "85%",
-                backgroundColor: "#fee2e2",
-                color: "#991b1b",
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                letterSpacing: "-0.01em",
-                wordWrap: "break-word" as const,
-                whiteSpace: "pre-wrap" as const,
-            },
             smallAvatar: {
                 width: "28px",
                 height: "28px",
                 borderRadius: "50%",
                 backgroundColor: theme === "dark" ? "#1e293b" : "#f1f5f9",
+                overflow: "hidden",
                 flexShrink: 0,
                 display: "flex",
                 alignItems: "center",
@@ -762,7 +773,19 @@ function WidgetChatContent() {
                 {/* Header */}
                 <div style={embeddedStyles.header}>
                     <div style={embeddedStyles.headerLeft}>
-                        <div style={embeddedStyles.avatar}>🤖</div>
+                        <div style={embeddedStyles.avatar}>
+                            {botAvatarUrl ? (
+                                <img
+                                    src={botAvatarUrl}
+                                    alt=""
+                                    referrerPolicy="no-referrer"
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                    onError={() => setAvatarLoadFailed(true)}
+                                />
+                            ) : (
+                                "🤖"
+                            )}
+                        </div>
                         <div style={embeddedStyles.botInfo}>
                             <div style={embeddedStyles.botName}>{botName}</div>
                             <div style={embeddedStyles.onlineStatus}>
@@ -778,24 +801,83 @@ function WidgetChatContent() {
                     {messages.map((m, i) => (
                         m.role === "assistant" ? (
                             <div key={`${i}-${m.timestamp}`} style={embeddedStyles.messageBot}>
-                                <div style={embeddedStyles.smallAvatar}>🤖</div>
-                                <div style={m.isError ? embeddedStyles.messageBubbleError : embeddedStyles.messageBubbleBot}>
-                                    {m.content || "(Empty message)"}
+                                <div style={embeddedStyles.smallAvatar}>
+                                    {botAvatarUrl ? (
+                                        <img
+                                            src={botAvatarUrl}
+                                            alt=""
+                                            referrerPolicy="no-referrer"
+                                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                            onError={() => setAvatarLoadFailed(true)}
+                                        />
+                                    ) : (
+                                        "🤖"
+                                    )}
+                                </div>
+                                <div
+                                    className={m.isError ? errorBubbleClass : botBubbleClass}
+                                    style={{
+                                        backgroundColor: m.isError
+                                            ? "#fee2e2"
+                                            : (theme === "dark" ? "#1e293b" : "#f1f5f9"),
+                                        color: m.isError
+                                            ? "#991b1b"
+                                            : (theme === "dark" ? "#ffffff" : "#0f172a"),
+                                        whiteSpace: "pre-wrap",
+                                        wordBreak: "break-word",
+                                        lineHeight: 1.5,
+                                    }}
+                                >
+                                    {m.content ? (
+                                        m.content
+                                    ) : m.streaming ? (
+                                        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                                            <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: 999, background: "currentColor", opacity: 0.55 }} />
+                                            <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: 999, background: "currentColor", opacity: 0.55, animationDelay: "0.2s" }} />
+                                            <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: 999, background: "currentColor", opacity: 0.55, animationDelay: "0.4s" }} />
+                                        </span>
+                                    ) : (
+                                        "(Empty message)"
+                                    )}
                                 </div>
                             </div>
                         ) : (
                             <div key={`${i}-${m.timestamp}`} style={embeddedStyles.messageUser}>
-                                <div style={embeddedStyles.messageBubbleUser}>
-                                    {m.content || "(Empty message)"}
+                                <div
+                                    className={userBubbleClass}
+                                    style={{
+                                        backgroundColor: primaryCss,
+                                        color: textCss,
+                                        whiteSpace: "pre-wrap",
+                                        wordBreak: "break-word",
+                                        lineHeight: 1.5,
+                                    }}
+                                >
+                                    {m.content || ""}
                                 </div>
                             </div>
                         )
                     ))}
 
                     {/* Loading indicator */}
-                    {isLoading && (
+                    {isLoading &&
+                        !messages.some(
+                            (m) => m.role === "assistant" && Boolean((m as any).streaming),
+                        ) && (
                         <div style={embeddedStyles.loadingIndicator}>
-                            <div style={embeddedStyles.smallAvatar}>🤖</div>
+                            <div style={embeddedStyles.smallAvatar}>
+                                {botAvatarUrl ? (
+                                    <img
+                                        src={botAvatarUrl}
+                                        alt=""
+                                        referrerPolicy="no-referrer"
+                                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                        onError={() => setAvatarLoadFailed(true)}
+                                    />
+                                ) : (
+                                    "🤖"
+                                )}
+                            </div>
                             <div style={embeddedStyles.loadingBubble}>
                                 <div style={{ ...embeddedStyles.loadingDot, animationDelay: "0s" }} className="animate-pulse"></div>
                                 <div style={{ ...embeddedStyles.loadingDot, animationDelay: "0.2s" }} className="animate-pulse"></div>
@@ -916,7 +998,7 @@ function WidgetChatContent() {
                     {/* Branding - Now in footer */}
                     <div style={embeddedStyles.branding}>
                         <a
-                            href="https://chat-pilot-agent.vercel.app/"
+                            href="https://www.chatpilot-agent.com/"
                             target="_blank"
                             rel="noopener noreferrer"
                             style={embeddedStyles.brandingLink}

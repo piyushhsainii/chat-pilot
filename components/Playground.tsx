@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { BotWithRelations } from "@/lib/types";
 import { useRouter } from "next/navigation";
 
@@ -9,15 +10,91 @@ type Message = {
   isStreaming?: boolean;
 };
 
+type CreditsState = {
+  balance: number | null;
+  total: number;
+};
+
+type KnowledgeSource = {
+  id: string;
+  name: string;
+  type: string | null;
+  status: string | null;
+  created_at: string | null;
+  doc_url: string[] | null;
+};
+
+const InfoTip = ({ text }: { text: string }) => {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const onEnter = (e: React.MouseEvent<HTMLSpanElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPos({ x: rect.left + rect.width / 2, y: rect.bottom + 10 });
+    setOpen(true);
+  };
+
+  const onLeave = () => setOpen(false);
+
+  return (
+    <span className="relative inline-flex items-center">
+      <span
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onFocus={onEnter as any}
+        onBlur={onLeave}
+        tabIndex={0}
+        role="note"
+        aria-label={text}
+        className="relative inline-flex items-center justify-center w-4 h-4 rounded-full border border-slate-300 text-[10px] font-black text-slate-500 cursor-help select-none"
+      >
+        i
+      </span>
+
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-[2147483647]"
+              style={{ left: pos.x, top: pos.y, transform: "translateX(-50%)" }}
+            >
+              <div className="relative w-64 rounded-xl bg-slate-900 text-white text-[11px] font-semibold leading-snug px-3 py-2 shadow-2xl">
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-slate-900" />
+                {text}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </span>
+  );
+};
+
+const FieldLabel = ({
+  label,
+  tip,
+}: {
+  label: string;
+  tip: string;
+}) => {
+  return (
+    <div className="flex items-center justify-between">
+      <label className="text-[9px] font-bold uppercase text-slate-400">
+        {label}
+      </label>
+      <InfoTip text={tip} />
+    </div>
+  );
+};
+
 // Playground Component
 export const Playground = ({
   selectedBot,
   credits,
-  setCredits,
+  refreshCredits,
 }: {
   selectedBot: BotWithRelations;
-  credits: any;
-  setCredits: any;
+  credits: CreditsState;
+  refreshCredits: () => Promise<void>;
 }) => {
   const [messages, setMessages] = useState<{
     [botId: string]: Message[];
@@ -40,6 +117,11 @@ export const Playground = ({
     answerStyle: selectedBot.tone,
     fallbackBehavior: selectedBot.fallback_behavior,
   });
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>(
+    [],
+  );
+  const [knowledgeLoading, setKnowledgeLoading] = useState(false);
   const updateBot = (key: string, value: string) => {
     setEditableBot((prev) => ({ ...prev, [key]: value }));
   };
@@ -61,6 +143,7 @@ export const Playground = ({
       answerStyle: selectedBot.tone,
       fallbackBehavior: selectedBot.fallback_behavior,
     })
+    setAvatarFailed(false);
     setMessages({
       [selectedBot.id]: [{
         role: "bot",
@@ -70,10 +153,35 @@ export const Playground = ({
     });
   }, [selectedBot])
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setKnowledgeLoading(true);
+        const res = await fetch(
+          `/api/bots/${encodeURIComponent(selectedBot.id)}/knowledge-sources`,
+          { cache: "no-store" },
+        );
+        const json = (await res.json().catch(() => ({}))) as any;
+        if (!cancelled && res.ok) {
+          setKnowledgeSources((json?.sources ?? []) as KnowledgeSource[]);
+        }
+      } catch {
+        if (!cancelled) setKnowledgeSources([]);
+      } finally {
+        if (!cancelled) setKnowledgeLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBot.id]);
+
   const handleSend = async () => {
     if (!input.trim() || !selectedBot || isStreaming) return;
 
-    if (credits.usedCredits >= credits.totalCredits) {
+    if (typeof credits.balance === "number" && credits.balance <= 0) {
       alert("Credit limit reached!");
       return;
     }
@@ -92,12 +200,6 @@ export const Playground = ({
         { role: "user", text: userMsg },
         { role: "bot", text: "", isStreaming: true },
       ],
-    }));
-
-    // Deduct credit
-    setCredits((prev: any) => ({
-      ...prev,
-      usedCredits: prev.usedCredits + 1,
     }));
 
     let fullText = "";
@@ -140,6 +242,7 @@ export const Playground = ({
     } finally {
       setIsStreaming(false);
       abortControllerRef.current = null;
+      refreshCredits();
     }
   };
 
@@ -156,7 +259,6 @@ export const Playground = ({
         botId: bot.id,
         query,
         history: currentMessages.slice(-12),
-        testMode: true,
       }),
       signal,
     });
@@ -192,6 +294,22 @@ export const Playground = ({
 
   const theme = selectedBot.widgets?.theme;
   const primaryColor = selectedBot.widgets?.primary_color;
+  const avatarUrl = (selectedBot as any)?.avatar_url as string | null | undefined;
+  const showAvatar = Boolean(avatarUrl && String(avatarUrl).trim()) && !avatarFailed;
+
+  const creditsPct = (() => {
+    if (credits.balance === null) return 0;
+    if (!credits.total) return 0;
+    const pct = (credits.balance / credits.total) * 100;
+    return Math.min(100, Math.max(0, pct));
+  })();
+
+  const creditsRingColor = (() => {
+    if (credits.balance === null) return "#94a3b8";
+    if (creditsPct >= 50) return "#10b981";
+    if (creditsPct >= 20) return "#f59e0b";
+    return "#ef4444";
+  })();
 
   return (
     <div className="flex w-full h-full overflow-hidden">
@@ -211,10 +329,22 @@ export const Playground = ({
           >
             <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-lg"
+                className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-lg overflow-hidden"
                 style={{ backgroundColor: primaryColor ?? "" }}
               >
-                🤖
+                {showAvatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={String(avatarUrl)}
+                    alt={`${editableBot.name} avatar`}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      setAvatarFailed(true);
+                    }}
+                  />
+                ) : (
+                  "🤖"
+                )}
               </div>
               <div>
                 <h5 className="font-bold text-sm tracking-tight">
@@ -314,18 +444,66 @@ export const Playground = ({
       {/* ================= RIGHT: AGENT SETTINGS ================= */}
       <div className="w-[360px] h-full pr-6 overflow-y-auto">
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+          {/* Credits */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-bold uppercase text-slate-400">
+                    Credits
+                  </p>
+                  <InfoTip text="Credits are consumed when your bot generates a reply. If you run out, the bot will stop responding until you add more." />
+                </div>
+                <div className="mt-1 text-sm font-black text-slate-900 tracking-tight">
+                  {credits.balance === null ? "…" : credits.balance} / {credits.total}
+                </div>
+                <div className="mt-0.5 text-[10px] font-semibold text-slate-500">
+                  {credits.balance === null
+                    ? "Loading…"
+                    : `${Math.round(creditsPct)}% available`}
+                </div>
+              </div>
+
+              <div
+                className="relative w-14 h-14 rounded-full"
+                style={{
+                  background: `conic-gradient(${creditsRingColor} ${creditsPct}%, #e2e8f0 0)`,
+                }}
+                aria-label="Credits remaining"
+                title={
+                  credits.balance === null
+                    ? "Credits loading"
+                    : `${credits.balance} / ${credits.total} credits (${Math.round(
+                        creditsPct,
+                      )}%)`
+                }
+              >
+                <div className="absolute inset-[4px] rounded-full bg-white flex items-center justify-center text-[10px] font-black text-slate-700">
+                  {credits.balance === null ? "…" : `${Math.round(creditsPct)}%`}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Name */}
-          <input
-            value={editableBot.name}
-            onChange={(e) => updateBot("name", e.target.value)}
-            className="w-full text-sm font-bold border-b border-dashed outline-none"
-          />
+          <div>
+            <FieldLabel
+              label="Name"
+              tip="This is the display name shown to users in the chat header." 
+            />
+            <input
+              value={editableBot.name}
+              onChange={(e) => updateBot("name", e.target.value)}
+              className="mt-1 w-full text-sm font-bold border-b border-dashed outline-none"
+            />
+          </div>
 
           {/* System Prompt */}
           <div>
-            <label className="text-[9px] font-bold uppercase text-slate-400">
-              System Prompt
-            </label>
+            <FieldLabel
+              label="System Prompt"
+              tip="Your bot's private instructions. Use this to define what it should do, what it should avoid, and how it should behave." 
+            />
             <textarea
               rows={4}
               value={editableBot.systemPrompt || ""}
@@ -336,32 +514,45 @@ export const Playground = ({
 
           {/* Tone & Style */}
           <div className="grid grid-cols-2 gap-3">
-            <select
-              value={editableBot.tone || ""}
-              onChange={(e) => updateBot("tone", e.target.value)}
-              className="text-xs p-2 border rounded-lg"
-            >
-              <option value="professional">Professional</option>
-              <option value="friendly">Friendly</option>
-              <option value="casual">Casual</option>
-            </select>
+            <div>
+              <FieldLabel
+                label="Tone"
+                tip="Controls the personality of responses (formal, friendly, casual, etc.)." 
+              />
+              <select
+                value={editableBot.tone || ""}
+                onChange={(e) => updateBot("tone", e.target.value)}
+                className="mt-1 w-full text-xs p-2 border rounded-lg"
+              >
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly</option>
+                <option value="casual">Casual</option>
+              </select>
+            </div>
 
-            <select
-              value={editableBot.answerStyle || ""}
-              onChange={(e) => updateBot("answerStyle", e.target.value)}
-              className="text-xs p-2 border rounded-lg"
-            >
-              <option value="concise">Concise</option>
-              <option value="balanced">Balanced</option>
-              <option value="detailed">Detailed</option>
-            </select>
+            <div>
+              <FieldLabel
+                label="Answer Style"
+                tip="Controls how short or detailed the bot's answers should be." 
+              />
+              <select
+                value={editableBot.answerStyle || ""}
+                onChange={(e) => updateBot("answerStyle", e.target.value)}
+                className="mt-1 w-full text-xs p-2 border rounded-lg"
+              >
+                <option value="concise">Concise</option>
+                <option value="balanced">Balanced</option>
+                <option value="detailed">Detailed</option>
+              </select>
+            </div>
           </div>
 
           {/* Fallback */}
           <div>
-            <label className="text-[9px] font-bold uppercase text-slate-400">
-              Fallback Message
-            </label>
+            <FieldLabel
+              label="Fallback Message"
+              tip="Used when the bot can't find an answer in your knowledge base. Keep it short and helpful." 
+            />
             <textarea
               rows={2}
               value={editableBot.fallbackBehavior || ""}
@@ -370,23 +561,69 @@ export const Playground = ({
             />
           </div>
 
+          {/* Knowledge base */}
+          <div className="pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <p className="text-[9px] font-bold uppercase text-slate-400">
+                Knowledge Base
+              </p>
+              <InfoTip text="These are the files and documents your bot can use as references when answering questions." />
+            </div>
+
+            <div className="mt-1 text-xs font-semibold text-slate-700">
+              {knowledgeLoading
+                ? "Loading files…"
+                : knowledgeSources.length
+                  ? `${knowledgeSources.length} file${
+                      knowledgeSources.length === 1 ? "" : "s"
+                    } connected`
+                  : "No files connected"}
+            </div>
+
+            {knowledgeSources.length ? (
+              <div className="mt-2 max-h-28 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                {knowledgeSources.slice(0, 20).map((s) => (
+                  <div
+                    key={s.id}
+                    className="px-3 py-2 border-b last:border-b-0 border-slate-100"
+                    title={s.name}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[12px] font-semibold text-slate-800 truncate">
+                        {s.name}
+                      </span>
+                      <span className="shrink-0 text-[10px] font-bold uppercase text-slate-500">
+                        {s.status ?? ""}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {knowledgeSources.length > 20 ? (
+                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-500">
+                    +{knowledgeSources.length - 20} more
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
           {/* Widget Theme Redirect */}
           <div
             onClick={() => router.push("/dashboard/deploy")}
             className="cursor-pointer pt-3 border-t hover:bg-slate-50 rounded-lg p-2 transition"
           >
-            <p className="text-[9px] font-bold uppercase text-slate-400">
-              Widget Theme
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-[9px] font-bold uppercase text-slate-400">
+                Widget Theme
+              </p>
+              <InfoTip text="Controls how your website widget looks (light/dark theme and colors)." />
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-xs font-semibold">{theme}</span>
               <span className="text-[10px] text-indigo-600 font-bold">
                 Customize →
               </span>
             </div>
-          </div>
-          <div>
-            <select name="" id=""></select>
           </div>
         </div>
       </div>

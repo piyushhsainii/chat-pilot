@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Bot, AlertCircle, CheckCircle2, Settings } from "lucide-react";
@@ -62,6 +62,14 @@ const CompactBotCard: React.FC<{
     onSelect: () => void;
 }> = ({ bot, isSelected, isConfigured, progress, checks, onSelect }) => {
     const [showTooltip, setShowTooltip] = useState(false);
+    const [avatarFailed, setAvatarFailed] = useState(false);
+
+    const avatarUrl = (bot as any)?.avatar_url as string | null | undefined;
+    const showAvatar = Boolean(avatarUrl && String(avatarUrl).trim()) && !avatarFailed;
+
+    useEffect(() => {
+        setAvatarFailed(false);
+    }, [avatarUrl]);
 
     return (
         <div className="relative snap-start flex-shrink-0">
@@ -102,14 +110,26 @@ const CompactBotCard: React.FC<{
                             left: 5,
                         }}
                     >
-                        <Bot
-                            className={`h-6 w-6 transition-colors ${isSelected
-                                    ? "text-white"
-                                    : isConfigured
-                                        ? "text-slate-600"
-                                        : "text-red-400"
-                                }`}
-                        />
+                        {showAvatar ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={String(avatarUrl)}
+                                alt={bot.name ? String(bot.name) : "Bot avatar"}
+                                className={`h-9 w-9 rounded-full object-cover ${isSelected ? "ring-2 ring-white/40" : ""}`}
+                                onError={(e) => {
+                                    setAvatarFailed(true);
+                                }}
+                            />
+                        ) : (
+                            <Bot
+                                className={`h-6 w-6 transition-colors ${isSelected
+                                        ? "text-white"
+                                        : isConfigured
+                                            ? "text-slate-600"
+                                            : "text-red-400"
+                                    }`}
+                            />
+                        )}
                     </div>
 
                     {/* Active Indicator Pulse */}

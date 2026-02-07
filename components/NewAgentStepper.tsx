@@ -45,6 +45,8 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
   const [isWidgetOpen, setisWidgetOpen] = useState(true);
   /* ---------------- BOT ---------------- */
   const [name, setName] = useState("Peak Support");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [tone, setTone] = useState("Professional");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [fallbackBehavior, setFallbackBehavior] = useState(
@@ -66,7 +68,8 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
   /* ---------------- WIDGET ---------------- */
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
-  const [secondaryColor, setsecondaryColor] = useState("#ffffff");
+  const [widgetButtonColor, setWidgetButtonColor] = useState("#4f46e5");
+  const [widgetIconColor, setWidgetIconColor] = useState("#ffffff");
 
   /* ---------------- KNOWLEDGE ---------------- */
   const [textInput, setTextInput] = useState("");
@@ -89,6 +92,7 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
         .from("bots")
         .insert({
           name,
+          avatar_url: avatarUrl || null,
           tone,
           owner_id: user?.id,
           workspace_id: workspaces?.workspace_id,
@@ -124,12 +128,62 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
         title: name,
         theme,
         primary_color: primaryColor,
-        button_color: secondaryColor,
+        button_color: widgetButtonColor,
+        text_color: widgetIconColor,
       });
     }
 
     setSaving(false);
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  }
+
+  async function uploadAvatarImage(file: File) {
+    if (!file.type || !file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const bucket = "knowledge-files";
+      const safeName = String(file.name || "avatar")
+        .replace(/[^a-zA-Z0-9._-]+/g, "-")
+        .slice(0, 80);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const userId = session?.user?.id || user?.id || "anonymous";
+
+      const path = botId
+        ? `${userId}/${botId}/avatar_${Date.now()}_${safeName}`
+        : `drafts/${userId}/avatar_${Date.now()}_${safeName}`;
+
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+        cacheControl: "3600",
+      });
+
+      if (error) {
+        console.error("Avatar upload error:", error);
+        alert(
+          `Avatar upload failed. Make sure the '${bucket}' storage bucket exists and is accessible.`,
+        );
+        return;
+      }
+
+      const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+      const publicUrl = publicData?.publicUrl;
+      if (!publicUrl) {
+        alert("Avatar uploaded, but could not get public URL");
+        return;
+      }
+
+      setAvatarUrl(publicUrl);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   }
 
   function isValidHttpsDomain(input: string) {
@@ -293,6 +347,38 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                       placeholder="Agent name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                    />
+
+                    <label
+                      htmlFor=""
+                      className="pl-1 font-semibold tracking-tighter text-gray-900"
+                    >
+                      Avatar URL
+                    </label>
+                    <input
+                      type="url"
+                      className="w-full border rounded-lg p-2"
+                      placeholder="https://..."
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                    />
+
+                    <label
+                      htmlFor=""
+                      className="pl-1 font-semibold tracking-tighter text-gray-900"
+                    >
+                      Upload Avatar Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingAvatar}
+                      className="w-full border rounded-lg p-2"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.currentTarget.value = "";
+                        if (file) uploadAvatarImage(file);
+                      }}
                     />
                     <label
                       htmlFor=""
@@ -632,19 +718,33 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                           </div>
                           <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                             <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
-                              Bubble Text
+                              Widget Button
                             </label>
                             <div className="flex items-center gap-3">
                               <input
                                 type="color"
-                                value={secondaryColor}
-                                onChange={(e) =>
-                                  setsecondaryColor(e.target.value)
-                                }
+                                value={widgetButtonColor}
+                                onChange={(e) => setWidgetButtonColor(e.target.value)}
                                 className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
                               />
                               <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
-                                {secondaryColor}
+                                {widgetButtonColor}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                            <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                              Widget Icon
+                            </label>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="color"
+                                value={widgetIconColor}
+                                onChange={(e) => setWidgetIconColor(e.target.value)}
+                                className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
+                              />
+                              <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
+                                {widgetIconColor}
                               </span>
                             </div>
                           </div>
@@ -745,7 +845,7 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                               className="p-4 rounded-2xl rounded-tr-none text-sm font-medium shadow-lg transition-all duration-300 max-w-[80%] tracking-tighter"
                               style={{
                                 backgroundColor: primaryColor,
-                                color: secondaryColor,
+                                color: widgetIconColor,
                               }}
                             >
                               Hey! I have a question about pricing.
@@ -803,10 +903,11 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                       {/* Trigger Icon - Always Visible Floating Button */}
                       <button
                         onClick={() => setisWidgetOpen(!isWidgetOpen)}
-                        className="group w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
+                        className="group w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
                         style={{
-                          backgroundColor: primaryColor,
-                          boxShadow: `0 20px 50px ${primaryColor}40`,
+                          backgroundColor: widgetButtonColor || primaryColor,
+                          color: widgetIconColor,
+                          boxShadow: `0 20px 50px ${(widgetButtonColor || primaryColor)}40`,
                         }}
                         aria-label={isWidgetOpen ? "Close chat" : "Open chat"}
                       >

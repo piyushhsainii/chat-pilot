@@ -126,8 +126,8 @@ const Sidebar: React.FC = () => {
   // Prevent hydration mismatch - render placeholder during SSR
   if (!mounted) {
     return (
-      <div className="w-64 relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col fixed top-0 left-0 z-40 bg-gradient-to-b from-white via-slate-50 to-indigo-50/60">
-        <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(600px_circle_at_20%_0%,rgba(99,102,241,0.22),transparent_60%),radial-gradient(500px_circle_at_20%_90%,rgba(14,165,233,0.14),transparent_65%)]" />
+      <div className="w-64 relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col fixed top-0 left-0 z-40 bg-gradient-to-b from-white via-slate-50 to-violet-50/60">
+        <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(600px_circle_at_20%_0%,rgba(144,95,214,0.22),transparent_60%),radial-gradient(500px_circle_at_20%_90%,rgba(118,87,168,0.14),transparent_65%)]" />
 
         <div className="relative p-5 border-b border-white/60 bg-white/55 backdrop-blur-sm flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -144,9 +144,9 @@ const Sidebar: React.FC = () => {
 
   return (
     <div
-      className={`${isCollapsed ? "w-20" : "w-64"} relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col fixed top-0 z-40 transition-all duration-300 ease-in-out bg-gradient-to-b from-white via-slate-50 to-indigo-50/60`}
+      className={`${isCollapsed ? "w-20" : "w-64"} relative overflow-hidden border-r border-slate-200/70 h-screen flex flex-col fixed top-0 z-40 transition-all duration-300 ease-in-out bg-gradient-to-b from-white via-slate-50 to-violet-50/60`}
     >
-      <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(600px_circle_at_20%_0%,rgba(99,102,241,0.22),transparent_60%),radial-gradient(500px_circle_at_20%_90%,rgba(14,165,233,0.14),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(600px_circle_at_20%_0%,rgba(144,95,214,0.22),transparent_60%),radial-gradient(500px_circle_at_20%_90%,rgba(118,87,168,0.14),transparent_65%)]" />
 
       <div className="relative p-5 border-b border-white/60 bg-white/55 backdrop-blur-sm flex items-center justify-between">
         {!isCollapsed && (
@@ -162,7 +162,7 @@ const Sidebar: React.FC = () => {
         )}
         <button
           onClick={toggleSidebar}
-          className={`p-2 rounded-xl ring-1 ring-slate-200/60 bg-white/60 hover:bg-white/80 text-slate-500 hover:text-slate-900 transition-all ${isCollapsed ? "mx-auto" : ""}`}
+          className={`p-2 rounded-xl ring-1 ring-slate-200/60 bg-white/60 text-slate-500 transition-all hover:bg-[rgba(144,95,214,0.10)] hover:text-[#7657a8] hover:ring-[rgba(144,95,214,0.25)] ${isCollapsed ? "mx-auto" : ""}`}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? <ArrowRight /> : <ArrowLeft />}
@@ -177,14 +177,14 @@ const Sidebar: React.FC = () => {
               key={item.id}
               onClick={() => handleNavigation(item)}
               className={`w-full flex items-center gap-3 rounded-2xl transition-all group ${isCollapsed ? "justify-center px-2 py-2" : "px-3 py-2"} ${isActive
-                ? "bg-white/70 text-slate-900 shadow-sm ring-1 ring-indigo-500/10"
+                ? "bg-white/70 text-slate-900 border border-[rgba(144,95,214,0.55)] shadow-[0_10px_25px_-18px_rgba(144,95,214,0.55)]"
                 : "text-slate-600 hover:bg-white/55 hover:text-slate-900"
                 }`}
             >
               <span
                 className={`grid h-9 w-9 shrink-0 place-items-center rounded-2xl transition-all ring-1 [&_svg]:h-5 [&_svg]:w-5 ${isActive
-                  ? "bg-gradient-to-br from-indigo-600 to-sky-500 text-white shadow-sm ring-indigo-500/20"
-                  : "bg-white/60 text-slate-500 ring-slate-200/60 group-hover:bg-indigo-50 group-hover:text-indigo-700 group-hover:ring-indigo-200/70"
+                  ? "bg-gradient-to-br from-[#9762e3] to-[#905fd6] text-slate-950 shadow-sm ring-[rgba(144,95,214,0.25)]"
+                  : "bg-white/60 text-slate-500 ring-slate-200/60 group-hover:bg-[rgba(144,95,214,0.12)] group-hover:text-[#7657a8] group-hover:ring-[rgba(144,95,214,0.35)]"
                   }`}
               >
                 {item.icon}
@@ -204,14 +204,14 @@ const Sidebar: React.FC = () => {
           <div
             className={`p-3 rounded-2xl border ${credits !== null && credits <= 20
               ? "bg-amber-50 border-amber-200"
-              : "bg-gradient-to-br from-white/70 to-indigo-50/70 border-white/60 ring-1 ring-indigo-500/10"
+              : "bg-gradient-to-br from-white/70 to-violet-50/70 border-white/60 ring-1 ring-[rgba(144,95,214,0.16)]"
               }`}
           >
             <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-tighter">
               Credits
             </p>
             <p
-              className={`text-sm font-black tracking-tighter ${credits !== null && credits <= 20 ? "text-amber-700" : "text-indigo-600"
+              className={`text-sm font-black tracking-tighter ${credits !== null && credits <= 20 ? "text-amber-700" : "text-[#9762e3]"
                 }`}
             >
               {creditsError ? "-" : credits === null ? "…" : credits}

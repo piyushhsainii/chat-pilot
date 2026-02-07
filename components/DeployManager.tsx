@@ -12,45 +12,152 @@ type ConfigCheck = {
 };
 
 const DeployManager: React.FC = () => {
-  const { bots, workspaces } = useDashboardStore();
+  const { bots, workspaces, setDashboard } = useDashboardStore();
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const selectedBot = bots?.find((se) => se.id == selectedBotId)
-  const [theme, setTheme] = useState<"light" | "dark">((selectedBot?.widgets?.theme as "light" | "dark"));
-  const [primaryColor, setPrimaryColor] = useState(selectedBot?.widgets?.primary_color ?? "#");
-  const [textColor, setTextColor] = useState(selectedBot?.widgets?.button_color ?? "#");
+  const [theme, setTheme] = useState<"light" | "dark">(
+    ((selectedBot?.widgets?.theme as "light" | "dark") ?? "light"),
+  );
+  const [primaryColor, setPrimaryColor] = useState(selectedBot?.widgets?.primary_color ?? "#6366f1");
+  const [launcherButtonColor, setLauncherButtonColor] = useState(selectedBot?.widgets?.button_color ?? "#4f46e5");
+  const [launcherIconColor, setLauncherIconColor] = useState((selectedBot?.widgets as any)?.text_color ?? "#ffffff");
   const [activeTab, setActiveTab] = useState<"content" | "style" | "embed">(
     "style",
   );
-  const [originalConfig, setOriginalConfig] = useState({
-    theme: selectedBot?.widgets?.theme as "light" | "dark",
-    primaryColor: selectedBot?.widgets?.primary_color,
-    textColor: selectedBot?.widgets?.button_color,
-    botName: selectedBot?.name,
-    welcomeMessage: selectedBot?.widgets?.greeting_message,
-    allowedDomains: [] as string[],
+  const [originalConfig, setOriginalConfig] = useState(() => {
+    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
+    const parsedDomains = Array.isArray(domainsRaw)
+      ? domainsRaw
+      : typeof domainsRaw === "string"
+        ? domainsRaw
+            .split(",")
+            .map((d: string) => d.trim())
+            .filter(Boolean)
+        : [];
+
+    return {
+      theme: ((selectedBot?.widgets?.theme as "light" | "dark") ?? "light") as "light" | "dark",
+      primaryColor: selectedBot?.widgets?.primary_color ?? "#6366f1",
+      launcherButtonColor: selectedBot?.widgets?.button_color ?? "#4f46e5",
+      launcherIconColor: (selectedBot?.widgets as any)?.text_color ?? "#ffffff",
+      botName: selectedBot?.widgets?.title ?? "Chat Pilot Assistant",
+      avatarUrl: (selectedBot as any)?.avatar_url ?? "",
+      welcomeMessage: selectedBot?.widgets?.greeting_message ?? "",
+      allowedDomains: parsedDomains,
+    };
   });
   const [isWidgetOpen, setIsWidgetOpen] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [botName, setBotName] = useState(selectedBot?.name ?? "Chat Pilot Assistant");
-  const [welcomeMessage, setWelcomeMessage] = useState(
-    selectedBot?.widgets?.greeting_message,
+  const [botName, setBotName] = useState(
+    selectedBot?.widgets?.title ?? "Chat Pilot Assistant",
+  );
+  const [avatarUrl, setAvatarUrl] = useState((selectedBot as any)?.avatar_url ?? "");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [previewAvatarFailed, setPreviewAvatarFailed] = useState(false);
+  const [welcomeMessage, setWelcomeMessage] = useState<string>(
+    selectedBot?.widgets?.greeting_message ?? "",
   );
   const [allowedDomains, setAllowedDomains] = useState<string[]>(() => {
-    const domains = selectedBot?.bot_settings?.allowed_domains;
+    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
+    if (!domainsRaw) return [];
 
-    if (!domains) return ["example.com"];
+    if (Array.isArray(domainsRaw)) return domainsRaw;
+    if (typeof domainsRaw === "string") {
+      return domainsRaw
+        .split(",")
+        .map((d: string) => d.trim())
+        .filter(Boolean);
+    }
 
-    if (Array.isArray(domains)) return domains;
-
-    // if it's a comma-separated string
-    // @ts-ignore
-    return domains.split(",").map(d => d.trim()).filter(Boolean);
+    return [];
   });
   const [domainInput, setDomainInput] = useState("");
 
+  function updateBotInStore(patch: { id: string; avatar_url?: string | null }) {
+    if (!bots || !bots.length) return;
+    const nextBots = bots.map((b: any) =>
+      b.id === patch.id ? { ...b, ...patch } : b,
+    );
+    setDashboard({ bots: nextBots as any });
+  }
+
   const botId = selectedBot?.id ?? "";
+
+  const botsForSelector = (bots || []).map((b: any) =>
+    b.id === selectedBotId ? { ...b, avatar_url: avatarUrl } : b,
+  );
+
+  async function uploadAvatarImage(file: File) {
+    if (!selectedBot?.id) return;
+
+    if (!file.type || !file.type.startsWith("image/")) {
+      toast("Please select an image file");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const bucket = "knowledge-files";
+      const safeName = String(file.name || "avatar")
+        .replace(/[^a-zA-Z0-9._-]+/g, "-")
+        .slice(0, 80);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      if (!userId) {
+        toast("Please sign in to upload an avatar");
+        return;
+      }
+
+      const path = `${userId}/${selectedBot.id}/avatar_${Date.now()}_${safeName}`;
+
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+        cacheControl: "3600",
+      });
+
+      if (error) {
+        console.error("Avatar upload error:", error);
+        toast(
+          `Avatar upload failed. Make sure the '${bucket}' storage bucket exists and is accessible.`,
+        );
+        return;
+      }
+
+      const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+      const publicUrl = publicData?.publicUrl;
+      if (!publicUrl) {
+        toast("Avatar uploaded, but could not get public URL");
+        return;
+      }
+
+      setAvatarUrl(publicUrl);
+
+      const { error: botUpdateError } = await supabase
+        .from("bots")
+        .update({ avatar_url: publicUrl })
+        .eq("id", selectedBot.id);
+
+      if (botUpdateError) {
+        console.error("Avatar db update error:", botUpdateError);
+        toast("Avatar uploaded, but failed to save to database");
+        return;
+      }
+
+      updateBotInStore({ id: selectedBot.id, avatar_url: publicUrl });
+
+      setOriginalConfig((prev) => ({ ...prev, avatarUrl: publicUrl }));
+      toast("Avatar uploaded");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
 
   function addDomain() {
     if (domainInput.trim() && !allowedDomains.includes(domainInput.trim())) {
@@ -62,46 +169,64 @@ const DeployManager: React.FC = () => {
   useEffect(() => {
     if (!selectedBot) return;
 
+    setPreviewAvatarFailed(false);
+
+    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
+    const parsedDomains = Array.isArray(domainsRaw)
+      ? domainsRaw
+      : typeof domainsRaw === "string"
+        ? domainsRaw
+            .split(",")
+            .map((d: string) => d.trim())
+            .filter(Boolean)
+        : [];
+    const nextAllowedDomains = parsedDomains.length ? parsedDomains : ["example.com"];
+
     setTheme(
       (selectedBot.widgets?.theme as "light" | "dark") ?? "light"
     );
 
     setPrimaryColor(
-      selectedBot.widgets?.primary_color ?? "#"
+      selectedBot.widgets?.primary_color ?? "#6366f1"
     );
 
-    setTextColor(
-      selectedBot.widgets?.button_color ?? "#ffffff"
+    setLauncherButtonColor(
+      selectedBot.widgets?.button_color ?? "#4f46e5"
+    );
+
+    setLauncherIconColor(
+      (selectedBot.widgets as any)?.text_color ?? "#ffffff"
     );
 
     setBotName(
       selectedBot?.widgets?.title ?? "Chat Pilot Assistant"
     );
 
+    setAvatarUrl(
+      (selectedBot as any)?.avatar_url ?? ""
+    );
+
     setWelcomeMessage(
       selectedBot.widgets?.greeting_message ?? ""
     );
     setOriginalConfig({
-      theme: selectedBot?.widgets?.theme as "light" | "dark",
-      primaryColor: selectedBot?.widgets?.primary_color,
-      textColor: selectedBot?.widgets?.button_color,
-      botName: selectedBot?.widgets?.title ?? "",
-      welcomeMessage: selectedBot?.widgets?.greeting_message,
-      allowedDomains: [] as string[],
+      theme: ((selectedBot?.widgets?.theme as "light" | "dark") ?? "light") as
+        | "light"
+        | "dark",
+      primaryColor: selectedBot?.widgets?.primary_color ?? "#6366f1",
+      launcherButtonColor: selectedBot?.widgets?.button_color ?? "#4f46e5",
+      launcherIconColor: (selectedBot?.widgets as any)?.text_color ?? "#ffffff",
+      botName: selectedBot?.widgets?.title ?? "Chat Pilot Assistant",
+      avatarUrl: (selectedBot as any)?.avatar_url ?? "",
+      welcomeMessage: selectedBot?.widgets?.greeting_message ?? "",
+      allowedDomains: nextAllowedDomains,
     })
-    const domains = selectedBot.bot_settings?.allowed_domains || [];
-
-    if (!domains) {
-      setAllowedDomains(["example.com"]);
-    } else if (Array.isArray(domains)) {
-      setAllowedDomains(domains);
-    } else {
-      setAllowedDomains(
-        // @ts-ignore
-        domains.split(",").map(d => d.trim()).filter(Boolean)
-      );
-    }
+    setAllowedDomains(nextAllowedDomains);
   }, [selectedBot]);
+
+  useEffect(() => {
+    setPreviewAvatarFailed(false);
+  }, [avatarUrl]);
 
   useEffect(() => {
     if (bots && bots.length > 0) {
@@ -158,22 +283,39 @@ const DeployManager: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!selectedBot) {
+      setHasChanges(false);
+      return;
+    }
+
     const hasChanged =
       theme !== originalConfig.theme ||
       primaryColor !== originalConfig.primaryColor ||
-      textColor !== originalConfig.textColor ||
+      launcherButtonColor !== (originalConfig as any).launcherButtonColor ||
+      launcherIconColor !== (originalConfig as any).launcherIconColor ||
       botName !== originalConfig.botName ||
+      avatarUrl !== (originalConfig as any).avatarUrl ||
       welcomeMessage !== originalConfig.welcomeMessage ||
-      JSON.stringify(allowedDomains) !== JSON.stringify(originalConfig.allowedDomains);
+      JSON.stringify(allowedDomains) !==
+        JSON.stringify(originalConfig.allowedDomains);
     setHasChanges(hasChanged);
 
     // Clear success message when user makes new changes
     if (hasChanged && saveSuccess) {
       setSaveSuccess(false);
     }
-  }, [theme, primaryColor, textColor, botName, welcomeMessage, allowedDomains, saveSuccess]);
-  console.log(primaryColor)
-  console.log(botId)
+  }, [
+    selectedBot,
+    theme,
+    primaryColor,
+    launcherButtonColor,
+    launcherIconColor,
+    botName,
+    avatarUrl,
+    welcomeMessage,
+    allowedDomains,
+    saveSuccess,
+  ]);
   // Save changes
   async function saveChanges() {
     setIsSaving(true);
@@ -183,10 +325,23 @@ const DeployManager: React.FC = () => {
       const { data } = await supabase.from("widgets").update({
         primary_color: primaryColor,
         greeting_message: welcomeMessage,
-        button_color: textColor,
+        button_color: launcherButtonColor,
+        text_color: launcherIconColor,
         theme: theme,
         title: botName,
       }).eq("bot_id", selectedBot?.id!).select('*').single()
+
+      const { error: botSaveError } = await supabase
+        .from("bots")
+        .update({ avatar_url: avatarUrl || null })
+        .eq("id", selectedBot?.id!);
+
+      if (botSaveError) {
+        console.error("Bot avatar save error:", botSaveError);
+        toast("Failed to save avatar");
+      }
+
+      updateBotInStore({ id: selectedBot?.id!, avatar_url: avatarUrl || null });
 
       if (!data) {
         toast("Failed to save");
@@ -198,8 +353,10 @@ const DeployManager: React.FC = () => {
       const newConfig = {
         theme,
         primaryColor,
-        textColor,
+        launcherButtonColor,
+        launcherIconColor,
         botName,
+        avatarUrl,
         welcomeMessage,
         allowedDomains,
       };
@@ -222,23 +379,35 @@ const DeployManager: React.FC = () => {
   function discardChanges() {
     setTheme((selectedBot?.widgets?.theme as "light" | "dark") ?? "light");
     setPrimaryColor(selectedBot?.widgets?.primary_color ?? "");
-    setTextColor(selectedBot?.widgets?.button_color ?? "");
-    setBotName(selectedBot?.name ?? "");
-    setWelcomeMessage(selectedBot?.widgets?.greeting_message);
-    setAllowedDomains(selectedBot?.bot_settings?.allowed_domains || []);
+    setLauncherButtonColor(selectedBot?.widgets?.button_color ?? "");
+    setLauncherIconColor((selectedBot?.widgets as any)?.text_color ?? "");
+    setBotName(selectedBot?.widgets?.title ?? "Chat Pilot Assistant");
+    setAvatarUrl((selectedBot as any)?.avatar_url ?? "");
+    setWelcomeMessage(selectedBot?.widgets?.greeting_message ?? "");
+    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
+    const parsedDomains = Array.isArray(domainsRaw)
+      ? domainsRaw
+      : typeof domainsRaw === "string"
+        ? domainsRaw
+            .split(",")
+            .map((d: string) => d.trim())
+            .filter(Boolean)
+        : [];
+    setAllowedDomains(parsedDomains.length ? parsedDomains : ["example.com"]);
     setHasChanges(false);
   }
 
 
 
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://chat-pilot-agent.vercel.app";
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.chatpilot-agent.com/")
+    .replace(/\/+$/, "");
 
   const embedCode = `<script
   src="${baseUrl}/widget.js"
   data-bot-id="${botId}"
   defer
-></script>`;
+ ></script>`;
 
   const iframeCode = `<iframe
   src="${baseUrl}/widget/chat?botId=${botId}&embedded=true"
@@ -259,7 +428,7 @@ const DeployManager: React.FC = () => {
         w-1/2 border-r border-slate-100 flex flex-col">
           {bots && bots.length > 0 ? (
             <HorizontalBotSelector
-              bots={bots}
+              bots={botsForSelector}
               getBotConfigChecks={getBotConfigChecks}
               getConfigProgress={getConfigProgress}
               isBotFullyConfigured={isBotFullyConfigured}
@@ -301,6 +470,43 @@ const DeployManager: React.FC = () => {
                   </button>
                 ))}
               </div>
+
+              {selectedBot && (
+                <div className="mt-3 grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                      Avatar URL
+                    </label>
+                    <input
+                      type="url"
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 font-medium tracking-tighter text-sm"
+                      placeholder="https://..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                      Upload Avatar Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingAvatar}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.currentTarget.value = "";
+                        if (file) uploadAvatarImage(file);
+                      }}
+                      className="block w-full text-xs"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 tracking-tighter">
+                      Uploads to Supabase Storage bucket `knowledge-files`.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-10">
@@ -406,10 +612,10 @@ const DeployManager: React.FC = () => {
                   <section className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                        Brand Colors
+                        Chat Accent
                       </h3>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                         <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
                           Primary
@@ -426,19 +632,46 @@ const DeployManager: React.FC = () => {
                           </span>
                         </div>
                       </div>
+                    </div>
+                  </section>
+
+                  <section className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
+                        Widget Launcher
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                         <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
-                          Bubble Text
+                          Widget Button Color
                         </label>
                         <div className="flex items-center gap-3">
                           <input
                             type="color"
-                            value={textColor}
-                            onChange={(e) => setTextColor(e.target.value)}
+                            value={launcherButtonColor}
+                            onChange={(e) => setLauncherButtonColor(e.target.value)}
                             className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
                           />
                           <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
-                            {textColor}
+                            {launcherButtonColor}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                        <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                          Widget Text Color
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={launcherIconColor}
+                            onChange={(e) => setLauncherIconColor(e.target.value)}
+                            className="w-10 h-10 rounded-lg border-none bg-transparent cursor-pointer"
+                          />
+                          <span className="text-xs font-mono font-bold text-slate-600 uppercase tracking-tighter">
+                            {launcherIconColor}
                           </span>
                         </div>
                       </div>
@@ -586,7 +819,7 @@ const DeployManager: React.FC = () => {
               backgroundSize: "32px 32px",
             }}
           />
-          <div className="text-center mb-10">
+          <div className="text-center mb-6">
             <h4 className="text-slate-400 font-black text-xs uppercase tracking-[0.4em] mb-2 tracking-tighter">
               Live Preview
             </h4>
@@ -596,10 +829,10 @@ const DeployManager: React.FC = () => {
           </div>
 
           {/* The Actual Widget Wrapper */}
-          <div className="relative w-full h-full flex flex-col items-end justify-end">
+          <div className="relative w-full flex flex-col items-end">
             {/* Simulated Chat Interface */}
             <div
-              className={`w-[380px] h-[580px] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200 z-10 mb-6 mr-4 transition-all duration-500 origin-bottom-right transform ${isWidgetOpen
+              className={`w-[380px] h-[580px] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200 z-10 mb-4 mr-4 transition-all duration-500 origin-bottom-right transform ${isWidgetOpen
                 ? "opacity-100 scale-100 translate-y-0"
                 : "opacity-0 scale-75 translate-y-12 pointer-events-none"
                 } ${theme === "dark" ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
@@ -613,8 +846,18 @@ const DeployManager: React.FC = () => {
                 style={{ borderTop: `6px solid ${primaryColor}` }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-xl shadow-sm">
-                    🤖
+                  <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-xl shadow-sm overflow-hidden">
+                    {avatarUrl && !previewAvatarFailed ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={String(avatarUrl)}
+                        alt={`${botName} avatar`}
+                        className="h-full w-full object-cover"
+                        onError={() => setPreviewAvatarFailed(true)}
+                      />
+                    ) : (
+                      "🤖"
+                    )}
                   </div>
                   <div>
                     <h5 className="font-bold text-sm tracking-tighter">
@@ -644,8 +887,18 @@ const DeployManager: React.FC = () => {
                     : "-translate-x-4 opacity-0"
                     }`}
                 >
-                  <div className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center text-xs">
-                    🤖
+                  <div className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center text-xs overflow-hidden">
+                    {avatarUrl && !previewAvatarFailed ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={String(avatarUrl)}
+                        alt={`${botName} avatar`}
+                        className="h-full w-full object-cover"
+                        onError={() => setPreviewAvatarFailed(true)}
+                      />
+                    ) : (
+                      "🤖"
+                    )}
                   </div>
                   <div
                     className={`p-4 rounded-2xl rounded-tl-none text-sm leading-relaxed max-w-[85%] shadow-sm tracking-tighter ${theme === "dark" ? "bg-slate-800" : "bg-slate-100"}`}
@@ -662,7 +915,7 @@ const DeployManager: React.FC = () => {
                 >
                   <div
                     className="p-4 rounded-2xl rounded-tr-none text-sm font-medium shadow-lg transition-all duration-300 max-w-[80%] tracking-tighter"
-                    style={{ backgroundColor: primaryColor, color: textColor }}
+                    style={{ backgroundColor: primaryColor, color: launcherIconColor || "#ffffff" }}
                   >
                     Hey! I have a question about pricing.
                   </div>
@@ -717,10 +970,11 @@ const DeployManager: React.FC = () => {
             {/* Trigger Icon - Always Visible Floating Button */}
             <button
               onClick={() => setIsWidgetOpen(!isWidgetOpen)}
-              className="group w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
+              className="group w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
               style={{
-                backgroundColor: primaryColor,
-                boxShadow: `0 20px 50px ${primaryColor}40`,
+                backgroundColor: launcherButtonColor || primaryColor,
+                color: launcherIconColor || "#ffffff",
+                boxShadow: `0 20px 50px ${(launcherButtonColor || primaryColor)}40`,
               }}
               aria-label={isWidgetOpen ? "Close chat" : "Open chat"}
             >

@@ -66,18 +66,52 @@ const DashboardPage = () => {
 
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const selectedBot = bots?.find((b) => b.id === selectedBotId);
-  const [credits, setCredits] = useState({
-    totalCredits: 500,
-    usedCredits: 142,
-    planName: "Starter",
-    costPerQuery: 1,
-  });
+
+  const workspaceTier =
+    (workspaces as any)?.workspaces?.tier ?? (workspaces as any)?.tier ?? "free";
+
+  const getPlanCredits = (tierRaw: any) => {
+    const t = String(tierRaw || "free").toLowerCase();
+    if (t === "business") return 25000;
+    if (t === "pro") return 5000;
+    return 500;
+  };
+
+  const [credits, setCredits] = useState<{ balance: number | null; total: number }>(
+    {
+      balance: null,
+      total: getPlanCredits(workspaceTier),
+    },
+  );
+
+  const refreshCredits = async () => {
+    try {
+      const res = await fetch("/api/user/credits", { cache: "no-store" });
+      if (!res.ok) return;
+      const json = (await res.json().catch(() => ({}))) as any;
+      const bal = json?.credits?.balance;
+      if (typeof bal === "number") {
+        setCredits((prev) => ({ ...prev, balance: bal }));
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     if (bots && bots.length > 0) {
-      setSelectedBotId(bots[0].id);
+      const firstConfigured = bots.find((b) => isBotFullyConfigured(b));
+      setSelectedBotId((firstConfigured ?? bots[0]).id);
     }
   }, [bots]);
+
+  useEffect(() => {
+    setCredits((prev) => ({ ...prev, total: getPlanCredits(workspaceTier) }));
+  }, [workspaceTier]);
+
+  useEffect(() => {
+    refreshCredits();
+  }, []);
 
 
   return (
@@ -95,7 +129,7 @@ const DashboardPage = () => {
             </h1>
           </div>
           <div className="text-sm font-bold text-indigo-600">
-            {credits.totalCredits - credits.usedCredits} / {credits.totalCredits} credits
+            {credits.balance === null ? "…" : credits.balance} / {credits.total} credits
           </div>
         </header>
 
@@ -118,27 +152,42 @@ const DashboardPage = () => {
         )}
 
         {/* Playground */}
-        {selectedBot && isBotFullyConfigured(selectedBot) && (
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-lg max-w-[1000px]">
-            <Playground
-              selectedBot={selectedBot}
-              credits={credits}
-              setCredits={setCredits}
-            />
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-slate-900">
+              Playground
+            </h2>
+            <p className="text-sm text-slate-600">
+              This is a playground test environment to test out the working of the ai bot agent.
+            </p>
           </div>
-        )}
 
-        {selectedBot && !isBotFullyConfigured(selectedBot) && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-sm text-red-700">
-            ⚠️ This bot is disabled because it’s not fully configured.
-            <Link
-              href={`/dashboard/bots/${selectedBot.id}/config`}
-              className="ml-2 underline font-semibold text-red-800"
-            >
-              Fix configuration
-            </Link>
-          </div>
-        )}
+          {!bots || bots.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center">
+              <p className="text-slate-500 text-sm">No bot is present. Create one to start testing.</p>
+            </div>
+          ) : selectedBot && isBotFullyConfigured(selectedBot) ? (
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-lg max-w-[1000px]">
+              <Playground
+                selectedBot={selectedBot}
+                credits={credits}
+                refreshCredits={refreshCredits}
+              />
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-sm text-amber-800">
+              Configure a bot to test it out in the Playground.
+              {selectedBot ? (
+                <Link
+                  href={`/dashboard/bots/${selectedBot.id}/config`}
+                  className="ml-2 underline font-semibold text-amber-900"
+                >
+                  Configure now
+                </Link>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
