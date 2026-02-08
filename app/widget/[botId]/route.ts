@@ -8,7 +8,10 @@ export async function GET(
 ) {
   const { botId } = await context.params;
 
-  const bot = await validateBot(botId, req.headers.get("referer"));
+  const bot = await validateBot(
+    botId,
+    req.headers.get("origin") || req.headers.get("referer"),
+  );
   if (!bot) {
     return new NextResponse("Unauthorized", { status: 403 });
   }

@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const bot = await validateBot(botId, req.headers.get("referer"));
+  const bot = await validateBot(
+    botId,
+    req.headers.get("origin") || req.headers.get("referer"),
+  );
   if (!bot) {
     const body = `try { window[${JSON.stringify(callback)}](null); } catch (e) {}`;
     return new Response(body, {

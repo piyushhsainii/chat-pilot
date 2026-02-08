@@ -32,7 +32,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const bot = await validateBot(botId, req.headers.get("referer"));
+  const bot = await validateBot(
+    botId,
+    req.headers.get("origin") || req.headers.get("referer"),
+  );
   if (!bot) {
     return NextResponse.json(
       { error: "Unauthorized" },

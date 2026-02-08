@@ -2,10 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { streamText, generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { buildKnowledgeContextForQuery } from "@/lib/knowledge/buildKnowledgeContextForQuery";
-import { consumeCreditsForOwner, getOwnerCreditsPrivileged } from "@/lib/billing/credits";
+import {
+  consumeCreditsForOwner,
+  isOutOfCreditsError,
+} from "@/lib/billing/credits";
 import { insertChatLog } from "@/lib/analytics/chatLogs";
 import { buildBotTools } from "@/lib/tools/buildBotTools";
+
+function parseTestMode(v: unknown) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
+function hostnameFromUrlLike(value?: string | null): string | null {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    try {
+      return new URL(`http://${raw}`).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+}
+
+function isAllowedHostname(hostname: string, allowed: string[]) {
+  const h = hostname.toLowerCase();
+  return allowed.some((raw) => {
+    const a = hostnameFromUrlLike(raw);
+    if (!a) return false;
+    return h === a || h.endsWith(`.${a}`);
+  });
+}
 
 type WidgetMessageBody = {
   botId?: string;
@@ -73,6 +105,7 @@ async function checkRateLimitWithAdmin(
 }
 
 export async function POST(req: NextRequest) {
+  const debugCredits = process.env.DEBUG_CREDITS === "1";
   const body = (await req.json().catch(() => null)) as WidgetMessageBody | null;
 
   const urlBotId = req.nextUrl.searchParams.get("botId") || req.nextUrl.searchParams.get("bot_id");
@@ -82,7 +115,7 @@ export async function POST(req: NextRequest) {
   const message = body?.message;
   const history = body?.history;
   const stream = Boolean(body?.stream);
-  const testMode = Boolean(body?.testMode);
+  const testMode = parseTestMode(body?.testMode);
 
   if (!message || (!session_id && !bodyBotId)) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
@@ -94,6 +127,11 @@ export async function POST(req: NextRequest) {
     "unknown";
 
   const admin = createAdminClient();
+  const supabase = await createClient();
+  const {
+    data: { session: authedSession },
+  } = await supabase.auth.getSession();
+  const authedUserId = authedSession?.user?.id ?? null;
 
   // 1) Resolve bot_id (prefer session, fallback to explicit botId)
   let resolvedSessionId = session_id || null;
@@ -144,9 +182,31 @@ export async function POST(req: NextRequest) {
 
   const { data: settings } = await admin
     .from("bot_settings" as any)
-    .select("rate_limit, rate_limit_hit_message")
+    .select("rate_limit, rate_limit_hit_message, allowed_domains")
     .eq("bot_id", resolvedBotId)
     .maybeSingle();
+
+  // Enforce domain restrictions when configured.
+  // - If no allowed domains exist: allow any origin.
+  // - If allowed domains exist: allow requests from our own host (iframe UI)
+  //   OR from an allowed origin.
+  const allowedDomains =
+    ((settings as any)?.allowed_domains?.filter(Boolean) as string[] | undefined) ??
+    [];
+  if (allowedDomains.length) {
+    const serverHostname = new URL(req.url).hostname.toLowerCase();
+    const reqHostname = hostnameFromUrlLike(
+      req.headers.get("origin") || req.headers.get("referer"),
+    );
+    const ok =
+      !!reqHostname &&
+      (reqHostname === serverHostname ||
+        reqHostname.endsWith(`.${serverHostname}`) ||
+        isAllowedHostname(reqHostname, allowedDomains));
+    if (!ok) {
+      return NextResponse.json({ error: "Unauthorized origin" }, { status: 403 });
+    }
+  }
 
   if (!testMode) {
     const rateLimit = (settings as any)?.rate_limit ?? 20;
@@ -190,17 +250,58 @@ export async function POST(req: NextRequest) {
   }
 
   const ownerId = (bot as any)?.owner_id as string | undefined;
+  let chargedBalance: number | null = null;
+  // Always charge the bot owner when available (public widget usage).
+  // Fall back to the authenticated caller only if owner_id is missing.
+  const chargeUserId = ownerId || authedUserId || null;
+  if (debugCredits) {
+    // eslint-disable-next-line no-console
+    console.info("[widget-message] request", {
+      botId: resolvedBotId,
+      ownerId: ownerId ?? null,
+      authedUserId,
+      chargeUserId,
+      stream,
+      testMode,
+    });
+  }
 
-  // If owner_id is missing (older rows / imported bots), don't hard-fail widget chat.
-  // We simply skip credit gating/charging.
-  if (ownerId) {
-    const ownerBalance = await getOwnerCreditsPrivileged(ownerId);
-    if (ownerBalance !== null && ownerBalance <= 0) {
-      const hitMessage = "This agent is temporarily unavailable (no credits).";
+  // Debit credits BEFORE calling the LLM.
+  // Prefer debiting the authenticated user (when present), fall back to bot owner.
+  if (!testMode && chargeUserId) {
+    const reason = stream ? "widget_message_stream" : "widget_message";
+    try {
+      const nextBalance = await consumeCreditsForOwner({
+        ownerId: chargeUserId,
+        botId: resolvedBotId,
+        amount: 1,
+        reason,
+      });
+      chargedBalance = typeof nextBalance === "number" ? nextBalance : null;
+      if (debugCredits) {
+        // eslint-disable-next-line no-console
+        console.info("[widget-message] precharge ok", {
+          chargeUserId,
+          nextBalance,
+          reason,
+        });
+      }
+    } catch (err) {
+      if (debugCredits) {
+        // eslint-disable-next-line no-console
+        console.info("[widget-message] precharge failed", {
+          chargeUserId,
+          reason,
+          err: String((err as any)?.message ?? err),
+        });
+      }
+      const hitMessage = isOutOfCreditsError(err)
+        ? "This agent is temporarily unavailable (no credits)."
+        : "Failed to consume credits.";
 
       if (stream) {
         const encoder = new TextEncoder();
-        const noCreditsStream = new ReadableStream({
+        const errStream = new ReadableStream({
           start(controller) {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ content: hitMessage })}\n\n`),
@@ -210,8 +311,8 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        return new Response(noCreditsStream, {
-          status: 402,
+        return new Response(errStream, {
+          status: isOutOfCreditsError(err) ? 402 : 500,
           headers: {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -223,7 +324,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         { role: "assistant", content: hitMessage },
-        { status: 402, headers: sessionHeader },
+        { status: isOutOfCreditsError(err) ? 402 : 500, headers: sessionHeader },
       );
     }
   }
@@ -296,23 +397,7 @@ Rules:
       tools: Object.keys(tools).length ? tools : undefined,
     });
 
-    if (!testMode && ownerId) {
-      await Promise.allSettled([
-        insertChatLog({
-          botId: resolvedBotId,
-          question: String(message),
-          answer: text,
-          environment: "widget",
-          metadata: { session_id: resolvedSessionId, ip, apps_used: Array.from(appsUsed) },
-        }),
-        consumeCreditsForOwner({
-          ownerId,
-          botId: resolvedBotId,
-          amount: 1,
-          reason: "widget_message",
-        }),
-      ]);
-    } else if (!testMode) {
+    if (!testMode) {
       await Promise.allSettled([
         insertChatLog({
           botId: resolvedBotId,
@@ -325,8 +410,15 @@ Rules:
     }
 
     return NextResponse.json(
-      { role: "assistant", content: text },
-      { headers: sessionHeader },
+      { role: "assistant", content: text, credits_balance: chargedBalance },
+      {
+        headers: {
+          ...sessionHeader,
+          ...(chargedBalance === null
+            ? {}
+            : { "x-chatpilot-owner-credits-balance": String(chargedBalance) }),
+        },
+      },
     );
   }
 
@@ -345,43 +437,20 @@ Rules:
     finalized = true;
     if (testMode) return;
 
-    await Promise.allSettled(
-      ownerId
-        ? [
-            insertChatLog({
-              botId: resolvedBotId,
-              question: String(message),
-              answer: fullAnswer,
-              environment: "widget_stream",
-              metadata: {
-                session_id: resolvedSessionId,
-                ip,
-                apps_used: Array.from(appsUsed),
-                ...(meta ?? {}),
-              },
-            }),
-            consumeCreditsForOwner({
-              ownerId,
-              botId: resolvedBotId,
-              amount: 1,
-              reason: "widget_message_stream",
-            }),
-          ]
-        : [
-            insertChatLog({
-              botId: resolvedBotId,
-              question: String(message),
-              answer: fullAnswer,
-              environment: "widget_stream",
-              metadata: {
-                session_id: resolvedSessionId,
-                ip,
-                apps_used: Array.from(appsUsed),
-                ...(meta ?? {}),
-              },
-            }),
-          ],
-    );
+    await Promise.allSettled([
+      insertChatLog({
+        botId: resolvedBotId,
+        question: String(message),
+        answer: fullAnswer,
+        environment: "widget_stream",
+        metadata: {
+          session_id: resolvedSessionId,
+          ip,
+          apps_used: Array.from(appsUsed),
+          ...(meta ?? {}),
+        },
+      }),
+    ]);
   };
 
   const streamBody = new ReadableStream({
@@ -415,6 +484,9 @@ Rules:
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...(chargedBalance === null
+        ? {}
+        : { "x-chatpilot-owner-credits-balance": String(chargedBalance) }),
       ...sessionHeader,
     },
   });

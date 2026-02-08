@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Missing botId", { status: 400 });
   }
 
-  const bot = await validateBot(botId, req.headers.get("referer"));
+  const bot = await validateBot(
+    botId,
+    req.headers.get("origin") || req.headers.get("referer"),
+  );
   if (!bot) {
     return new NextResponse("Unauthorized", { status: 403 });
   }

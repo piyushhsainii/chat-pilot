@@ -3,14 +3,25 @@ import { openai } from "@ai-sdk/openai";
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildKnowledgeContextForQuery } from "@/lib/knowledge/buildKnowledgeContextForQuery";
-import { consumeCreditsForOwner, getOwnerCreditsPrivileged } from "@/lib/billing/credits";
+import {
+  consumeCreditsForOwner,
+  getOwnerCreditsPrivileged,
+  isOutOfCreditsError,
+} from "@/lib/billing/credits";
 import { insertChatLog } from "@/lib/analytics/chatLogs";
 import { checkRateLimit } from "@/lib/checkrateLimit";
 import { buildBotTools } from "@/lib/tools/buildBotTools";
 
+function parseTestMode(v: unknown) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { botId, query, history, testMode } = await req.json();
+    const debugCredits = process.env.DEBUG_CREDITS === "1";
+    const body = await req.json();
+    const { botId, query, history } = body;
+    const testMode = parseTestMode(body?.testMode);
 
     if (!botId || !query) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), {
@@ -20,6 +31,10 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const authedUserId = session?.user?.id ?? null;
 
     const { data: bot, error: botError } = await supabase
       .from("bots")
@@ -80,12 +95,66 @@ export async function POST(req: NextRequest) {
     }
 
     const ownerId = botData.owner_id as string | undefined;
-    if (ownerId) {
-      const ownerBalance = await getOwnerCreditsPrivileged(ownerId);
-      if (ownerBalance !== null && ownerBalance <= 0) {
-        return new Response(JSON.stringify({ error: "No credits" }), {
-          status: 402,
-          headers: { "Content-Type": "application/json" },
+    let chargedBalance: number | null = null;
+    // Always charge the bot owner when available (widget/public usage).
+    // Fall back to the authenticated caller only if owner_id is missing.
+    const chargeUserId = ownerId || authedUserId || null;
+    if (debugCredits) {
+      // eslint-disable-next-line no-console
+      console.info("[chat-stream] request", {
+        botId,
+        ownerId: ownerId ?? null,
+        authedUserId,
+        chargeUserId,
+        testMode: Boolean(testMode),
+      });
+    }
+
+    // Debit credits BEFORE calling the LLM.
+    // Prefer debiting the authenticated user (dashboard usage), fall back to bot owner.
+    if (!testMode && chargeUserId) {
+      try {
+        const nextBalance = await consumeCreditsForOwner({
+          ownerId: chargeUserId,
+          botId,
+          amount: 1,
+          reason: "dashboard_stream",
+        });
+        chargedBalance = typeof nextBalance === "number" ? nextBalance : null;
+        if (debugCredits) {
+          // eslint-disable-next-line no-console
+          console.info("[chat-stream] precharge ok", { chargeUserId, nextBalance });
+        }
+      } catch (err) {
+        if (debugCredits) {
+          // eslint-disable-next-line no-console
+          console.info("[chat-stream] precharge failed", {
+            chargeUserId,
+            err: String((err as any)?.message ?? err),
+          });
+        }
+        const hitMessage = isOutOfCreditsError(err)
+          ? "This agent is temporarily unavailable (no credits)."
+          : "Failed to consume credits.";
+
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ content: hitMessage })}\n\n`),
+            );
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+
+        return new Response(stream, {
+          status: isOutOfCreditsError(err) ? 402 : 500,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
         });
       }
     }
@@ -171,16 +240,7 @@ ${botData.system_prompt || "Be helpful and concise."}
         metadata: { ip, apps_used: Array.from(appsUsed), ...(meta ?? {}) },
       });
 
-      const chargePromise = ownerId
-        ? consumeCreditsForOwner({
-            ownerId,
-            botId,
-            amount: 1,
-            reason: "dashboard_stream",
-          })
-        : Promise.resolve(null);
-
-      await Promise.allSettled([logPromise, chargePromise]);
+      await Promise.allSettled([logPromise]);
     };
 
     // Create a readable stream for SSE (Server-Sent Events)
@@ -218,6 +278,9 @@ ${botData.system_prompt || "Be helpful and concise."}
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        ...(chargedBalance === null
+          ? {}
+          : { "x-chatpilot-owner-credits-balance": String(chargedBalance) }),
       },
     });
   } catch (error) {

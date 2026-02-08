@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
   }
   const supabaseServer = await createClient();
   // 1️⃣ Validate bot + domain
-  const bot = await validateBot(botId, req.headers.get("referer"));
+  const bot = await validateBot(
+    botId,
+    req.headers.get("origin") || req.headers.get("referer"),
+  );
   if (!bot) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

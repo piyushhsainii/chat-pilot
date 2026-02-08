@@ -3,23 +3,36 @@ import { openai } from "@ai-sdk/openai";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildKnowledgeContextForQuery } from "@/lib/knowledge/buildKnowledgeContextForQuery";
-import { consumeCreditsForOwner, getOwnerCreditsPrivileged } from "@/lib/billing/credits";
+import {
+  consumeCreditsForOwner,
+  getOwnerCreditsPrivileged,
+  isOutOfCreditsError,
+} from "@/lib/billing/credits";
 import { insertChatLog } from "@/lib/analytics/chatLogs";
 import { checkRateLimit } from "@/lib/checkrateLimit";
 import { buildBotTools } from "@/lib/tools/buildBotTools";
 
+function parseTestMode(v: unknown) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
 export async function POST(req: NextRequest) {
+  const debugCredits = process.env.DEBUG_CREDITS === "1";
   const body = await req.json().catch(() => null);
   const botId = body?.botId;
   const message = body?.message ?? body?.query;
   const history = body?.history;
-  const testMode = body?.testMode;
+  const testMode = parseTestMode(body?.testMode);
 
   if (!botId || !message) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
   const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const authedUserId = session?.user?.id ?? null;
 
   const { data: bot, error: botError } = await supabase
     .from("bots" as any)
@@ -62,12 +75,55 @@ export async function POST(req: NextRequest) {
   }
 
   const ownerId = botData.owner_id as string | undefined;
-  if (ownerId) {
-    const ownerBalance = await getOwnerCreditsPrivileged(ownerId);
-    if (ownerBalance !== null && ownerBalance <= 0) {
+  let chargedBalance: number | null = null;
+  // Always charge the bot owner when available (widget/public usage).
+  // Fall back to the authenticated caller only if owner_id is missing.
+  const chargeUserId = ownerId || authedUserId || null;
+  if (debugCredits) {
+    // eslint-disable-next-line no-console
+    console.info("[chat] request", {
+      botId,
+      ownerId: ownerId ?? null,
+      authedUserId,
+      chargeUserId,
+      testMode: Boolean(testMode),
+    });
+  }
+
+  // Debit credits BEFORE calling the LLM.
+  // Prefer debiting the authenticated user (dashboard usage), fall back to bot owner.
+  if (!testMode && chargeUserId) {
+    // Consume a credit before calling the LLM so parallel requests can't
+    // generate free responses.
+    try {
+      const nextBalance = await consumeCreditsForOwner({
+        ownerId: chargeUserId,
+        botId,
+        amount: 1,
+        reason: "dashboard_chat",
+      });
+      chargedBalance = typeof nextBalance === "number" ? nextBalance : null;
+      if (debugCredits) {
+        // eslint-disable-next-line no-console
+        console.info("[chat] precharge ok", { chargeUserId, nextBalance });
+      }
+    } catch (err) {
+      if (debugCredits) {
+        // eslint-disable-next-line no-console
+        console.info("[chat] precharge failed", {
+          chargeUserId,
+          err: String((err as any)?.message ?? err),
+        });
+      }
+      if (isOutOfCreditsError(err)) {
+        return NextResponse.json(
+          { answer: "This agent is temporarily unavailable (no credits)." },
+          { status: 402 },
+        );
+      }
       return NextResponse.json(
-        { answer: "This agent is temporarily unavailable (no credits)." },
-        { status: 402 },
+        { error: "Failed to consume credits" },
+        { status: 500 },
       );
     }
   }
@@ -134,7 +190,7 @@ ${botData.system_prompt || "Be helpful and concise."}
   });
 
   if (!testMode) {
-    // Best-effort: chat should still respond even if logging/billing fails.
+    // Best-effort: chat should still respond even if logging fails.
     const logPromise = insertChatLog({
       botId,
       question: String(message),
@@ -143,17 +199,13 @@ ${botData.system_prompt || "Be helpful and concise."}
       metadata: { ip, apps_used: Array.from(appsUsed) },
     });
 
-    const chargePromise = ownerId
-      ? consumeCreditsForOwner({
-          ownerId,
-          botId,
-          amount: 1,
-          reason: "dashboard_chat",
-        })
-      : Promise.resolve(null);
-
-    await Promise.allSettled([logPromise, chargePromise]);
+    await Promise.allSettled([logPromise]);
   }
 
-  return NextResponse.json({ answer: text });
+  return NextResponse.json(
+    { answer: text, credits_balance: chargedBalance },
+    chargedBalance === null
+      ? undefined
+      : { headers: { "x-chatpilot-owner-credits-balance": String(chargedBalance) } },
+  );
 }

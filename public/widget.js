@@ -628,7 +628,7 @@
 
 <div class="wrapper">
   <iframe
-    src="${this.config.baseUrl}/widget/chat?${params.toString()}"
+    src="${this.config.baseUrl}/api/widget/chat?${params.toString()}"
     title="${this.config.name}"
     allow="clipboard-write"
     loading="eager"

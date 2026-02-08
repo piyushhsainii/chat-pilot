@@ -568,7 +568,9 @@ function WidgetChatContent() {
                 height: "100vh",
                 display: "flex",
                 flexDirection: "column" as const,
-                backgroundColor: theme === "dark" ? "#0f172a" : "#ffffff",
+                background: theme === "dark"
+                    ? "radial-gradient(900px 360px at 10% 0%, rgba(99, 102, 241, 0.14), transparent 60%), radial-gradient(700px 300px at 90% 20%, rgba(16, 185, 129, 0.10), transparent 55%), #0b1220"
+                    : "radial-gradient(900px 360px at 10% 0%, rgba(99, 102, 241, 0.10), transparent 60%), radial-gradient(700px 300px at 90% 20%, rgba(16, 185, 129, 0.08), transparent 55%), #ffffff",
                 color: theme === "dark" ? "#ffffff" : "#0f172a",
                 fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
             },
@@ -580,7 +582,11 @@ function WidgetChatContent() {
                 borderBottom: theme === "dark" ? "1px solid #1e293b" : "1px solid #f1f5f9",
                 borderTop: `4px solid ${primaryCss}`,
                 flexShrink: 0,
-                backgroundColor: theme === "dark" ? "#0f172a" : "#ffffff",
+                backgroundColor: theme === "dark" ? "rgba(11, 18, 32, 0.85)" : "rgba(255,255,255,0.85)",
+                backdropFilter: "blur(10px)",
+                boxShadow: theme === "dark"
+                    ? "0 10px 30px rgba(0, 0, 0, 0.35)"
+                    : "0 10px 30px rgba(15, 23, 42, 0.08)",
             },
             headerLeft: {
                 display: "flex",
@@ -597,7 +603,12 @@ function WidgetChatContent() {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "20px",
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+                boxShadow: theme === "dark"
+                    ? "0 10px 24px rgba(0, 0, 0, 0.35)"
+                    : "0 10px 24px rgba(15, 23, 42, 0.12)",
+                border: theme === "dark"
+                    ? "1px solid rgba(148, 163, 184, 0.16)"
+                    : "1px solid rgba(148, 163, 184, 0.25)",
             },
             botInfo: {
                 display: "flex",
@@ -635,7 +646,7 @@ function WidgetChatContent() {
                 flexDirection: "column" as const,
                 gap: "16px",
                 minHeight: 0,
-                backgroundColor: theme === "dark" ? "#0f172a" : "#ffffff",
+                backgroundColor: "transparent",
             },
             messageBot: {
                 display: "flex",
@@ -659,6 +670,12 @@ function WidgetChatContent() {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "14px",
+                boxShadow: theme === "dark"
+                    ? "0 8px 16px rgba(0,0,0,0.35)"
+                    : "0 8px 16px rgba(15, 23, 42, 0.10)",
+                border: theme === "dark"
+                    ? "1px solid rgba(148, 163, 184, 0.16)"
+                    : "1px solid rgba(148, 163, 184, 0.25)",
             },
             loadingIndicator: {
                 display: "flex",
@@ -674,6 +691,9 @@ function WidgetChatContent() {
                 display: "flex",
                 gap: "6px",
                 alignItems: "center",
+                boxShadow: theme === "dark"
+                    ? "0 18px 40px rgba(0,0,0,0.35)"
+                    : "0 18px 40px rgba(15, 23, 42, 0.12)",
             },
             loadingDot: {
                 width: "8px",
@@ -723,7 +743,11 @@ function WidgetChatContent() {
                 padding: "16px 24px 16px",
                 borderTop: theme === "dark" ? "1px solid #1e293b" : "1px solid #f1f5f9",
                 flexShrink: 0,
-                backgroundColor: theme === "dark" ? "#0f172a" : "#ffffff",
+                backgroundColor: theme === "dark" ? "rgba(11, 18, 32, 0.85)" : "rgba(255,255,255,0.90)",
+                backdropFilter: "blur(10px)",
+                boxShadow: theme === "dark"
+                    ? "0 -12px 30px rgba(0,0,0,0.35)"
+                    : "0 -12px 30px rgba(15, 23, 42, 0.06)",
             },
             inputWrapper: {
                 display: "flex",
@@ -734,10 +758,13 @@ function WidgetChatContent() {
                 border: theme === "dark" ? "1.5px solid #334155" : "1.5px solid #e2e8f0",
                 backgroundColor: theme === "dark" ? "#1e293b" : "#ffffff",
                 transition: "border-color 0.2s, box-shadow 0.2s",
+                boxShadow: theme === "dark"
+                    ? "0 12px 26px rgba(0,0,0,0.35)"
+                    : "0 12px 26px rgba(15, 23, 42, 0.08)",
             },
             inputWrapperFocused: {
                 borderColor: primaryCss,
-                boxShadow: `0 0 0 3px ${primaryCss}15`,
+                boxShadow: `0 0 0 3px ${primaryCss}22, 0 14px 28px rgba(15, 23, 42, 0.10)`,
             },
             input: {
                 backgroundColor: "transparent",
@@ -776,12 +803,14 @@ function WidgetChatContent() {
                         <div style={embeddedStyles.avatar}>
                             {botAvatarUrl ? (
                                 <img
-                                    src={botAvatarUrl}
-                                    alt=""
-                                    referrerPolicy="no-referrer"
-                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                                    onError={() => setAvatarLoadFailed(true)}
-                                />
+                                            src={botAvatarUrl}
+                                            alt=""
+                                            crossOrigin="anonymous"
+                                            referrerPolicy="no-referrer"
+                                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                            decoding="async"
+                                            onError={() => setAvatarLoadFailed(true)}
+                                        />
                             ) : (
                                 "🤖"
                             )}
@@ -803,11 +832,13 @@ function WidgetChatContent() {
                             <div key={`${i}-${m.timestamp}`} style={embeddedStyles.messageBot}>
                                 <div style={embeddedStyles.smallAvatar}>
                                     {botAvatarUrl ? (
-                                        <img
+                                    <img
                                             src={botAvatarUrl}
                                             alt=""
+                                            crossOrigin="anonymous"
                                             referrerPolicy="no-referrer"
                                             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                            decoding="async"
                                             onError={() => setAvatarLoadFailed(true)}
                                         />
                                     ) : (
@@ -826,6 +857,9 @@ function WidgetChatContent() {
                                         whiteSpace: "pre-wrap",
                                         wordBreak: "break-word",
                                         lineHeight: 1.5,
+                                        boxShadow: theme === "dark"
+                                            ? "0 18px 40px rgba(0,0,0,0.32)"
+                                            : "0 18px 40px rgba(15, 23, 42, 0.12)",
                                     }}
                                 >
                                     {m.content ? (
@@ -851,6 +885,9 @@ function WidgetChatContent() {
                                         whiteSpace: "pre-wrap",
                                         wordBreak: "break-word",
                                         lineHeight: 1.5,
+                                        boxShadow: theme === "dark"
+                                            ? "0 18px 40px rgba(0,0,0,0.34)"
+                                            : `0 18px 40px ${primaryCss}26`,
                                     }}
                                 >
                                     {m.content || ""}
@@ -870,8 +907,10 @@ function WidgetChatContent() {
                                     <img
                                         src={botAvatarUrl}
                                         alt=""
+                                        crossOrigin="anonymous"
                                         referrerPolicy="no-referrer"
                                         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                        decoding="async"
                                         onError={() => setAvatarLoadFailed(true)}
                                     />
                                 ) : (

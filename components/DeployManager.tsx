@@ -11,6 +11,39 @@ type ConfigCheck = {
   valid: boolean;
 };
 
+function normalizeDomainInput(value: string): string | null {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return null;
+
+  // Allow users to paste full URLs; we only persist hostnames.
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    try {
+      return new URL(`http://${raw}`).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+}
+
+function parseAllowedDomains(domainsRaw: any): string[] {
+  const list = Array.isArray(domainsRaw)
+    ? domainsRaw
+    : typeof domainsRaw === "string"
+      ? domainsRaw
+          .split(",")
+          .map((d: string) => d.trim())
+          .filter(Boolean)
+      : [];
+
+  const normalized = list
+    .map((d: any) => normalizeDomainInput(String(d ?? "")))
+    .filter(Boolean) as string[];
+
+  return Array.from(new Set(normalized));
+}
+
 const DeployManager: React.FC = () => {
   const { bots, workspaces, setDashboard } = useDashboardStore();
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
@@ -25,15 +58,9 @@ const DeployManager: React.FC = () => {
     "style",
   );
   const [originalConfig, setOriginalConfig] = useState(() => {
-    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
-    const parsedDomains = Array.isArray(domainsRaw)
-      ? domainsRaw
-      : typeof domainsRaw === "string"
-        ? domainsRaw
-            .split(",")
-            .map((d: string) => d.trim())
-            .filter(Boolean)
-        : [];
+    const parsedDomains = parseAllowedDomains(
+      (selectedBot as any)?.bot_settings?.allowed_domains,
+    );
 
     return {
       theme: ((selectedBot?.widgets?.theme as "light" | "dark") ?? "light") as "light" | "dark",
@@ -59,23 +86,17 @@ const DeployManager: React.FC = () => {
   const [welcomeMessage, setWelcomeMessage] = useState<string>(
     selectedBot?.widgets?.greeting_message ?? "",
   );
-  const [allowedDomains, setAllowedDomains] = useState<string[]>(() => {
-    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
-    if (!domainsRaw) return [];
-
-    if (Array.isArray(domainsRaw)) return domainsRaw;
-    if (typeof domainsRaw === "string") {
-      return domainsRaw
-        .split(",")
-        .map((d: string) => d.trim())
-        .filter(Boolean);
-    }
-
-    return [];
-  });
+  const [allowedDomains, setAllowedDomains] = useState<string[]>(() =>
+    parseAllowedDomains((selectedBot as any)?.bot_settings?.allowed_domains),
+  );
   const [domainInput, setDomainInput] = useState("");
 
-  function updateBotInStore(patch: { id: string; avatar_url?: string | null }) {
+  function updateBotInStore(patch: {
+    id: string;
+    avatar_url?: string | null;
+    widgets?: any;
+    bot_settings?: any;
+  }) {
     if (!bots || !bots.length) return;
     const nextBots = bots.map((b: any) =>
       b.id === patch.id ? { ...b, ...patch } : b,
@@ -160,10 +181,14 @@ const DeployManager: React.FC = () => {
   }
 
   function addDomain() {
-    if (domainInput.trim() && !allowedDomains.includes(domainInput.trim())) {
-      setAllowedDomains([...allowedDomains, domainInput.trim()]);
+    const next = normalizeDomainInput(domainInput);
+    if (!next) return;
+    if (allowedDomains.includes(next)) {
       setDomainInput("");
+      return;
     }
+    setAllowedDomains([...allowedDomains, next]);
+    setDomainInput("");
   }
 
   useEffect(() => {
@@ -171,16 +196,9 @@ const DeployManager: React.FC = () => {
 
     setPreviewAvatarFailed(false);
 
-    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
-    const parsedDomains = Array.isArray(domainsRaw)
-      ? domainsRaw
-      : typeof domainsRaw === "string"
-        ? domainsRaw
-            .split(",")
-            .map((d: string) => d.trim())
-            .filter(Boolean)
-        : [];
-    const nextAllowedDomains = parsedDomains.length ? parsedDomains : ["example.com"];
+    const nextAllowedDomains = parseAllowedDomains(
+      (selectedBot as any)?.bot_settings?.allowed_domains,
+    );
 
     setTheme(
       (selectedBot.widgets?.theme as "light" | "dark") ?? "light"
@@ -322,19 +340,44 @@ const DeployManager: React.FC = () => {
     setSaveSuccess(false);
 
     try {
-      const { data } = await supabase.from("widgets").update({
+      if (!selectedBot?.id) {
+        toast("No bot selected");
+        return;
+      }
+
+      const widgetPayload = {
+        bot_id: selectedBot.id,
         primary_color: primaryColor,
         greeting_message: welcomeMessage,
         button_color: launcherButtonColor,
         text_color: launcherIconColor,
         theme: theme,
         title: botName,
-      }).eq("bot_id", selectedBot?.id!).select('*').single()
+      };
+
+      const { data: widgetRow, error: widgetSaveError } = await supabase
+        .from("widgets")
+        .upsert(widgetPayload as any, { onConflict: "bot_id" })
+        .select("*")
+        .maybeSingle();
+
+      if (widgetSaveError) {
+        console.error("Widget save error:", widgetSaveError);
+        toast(`Failed to save widget: ${widgetSaveError.message}`);
+        return;
+      }
+
+      if (!widgetRow) {
+        toast("Failed to save widget");
+        return;
+      }
+
+      updateBotInStore({ id: selectedBot.id, widgets: widgetRow });
 
       const { error: botSaveError } = await supabase
         .from("bots")
         .update({ avatar_url: avatarUrl || null })
-        .eq("id", selectedBot?.id!);
+        .eq("id", selectedBot.id);
 
       if (botSaveError) {
         console.error("Bot avatar save error:", botSaveError);
@@ -343,10 +386,26 @@ const DeployManager: React.FC = () => {
 
       updateBotInStore({ id: selectedBot?.id!, avatar_url: avatarUrl || null });
 
-      if (!data) {
-        toast("Failed to save");
-        discardChanges()
-        return;
+      const { error: settingsSaveError } = await supabase
+        .from("bot_settings")
+        .upsert(
+          {
+            bot_id: selectedBot.id,
+            allowed_domains: allowedDomains.length ? allowedDomains : null,
+          },
+          { onConflict: "bot_id" },
+        );
+      if (settingsSaveError) {
+        console.error("Bot settings save error:", settingsSaveError);
+        toast("Failed to save authorized domains");
+      } else {
+        updateBotInStore({
+          id: selectedBot?.id!,
+          bot_settings: {
+            ...(selectedBot as any)?.bot_settings,
+            allowed_domains: allowedDomains.length ? allowedDomains : null,
+          },
+        });
       }
 
       // Update original config to match current state
@@ -378,22 +437,16 @@ const DeployManager: React.FC = () => {
   // Discard changes
   function discardChanges() {
     setTheme((selectedBot?.widgets?.theme as "light" | "dark") ?? "light");
-    setPrimaryColor(selectedBot?.widgets?.primary_color ?? "");
-    setLauncherButtonColor(selectedBot?.widgets?.button_color ?? "");
-    setLauncherIconColor((selectedBot?.widgets as any)?.text_color ?? "");
+    setPrimaryColor(selectedBot?.widgets?.primary_color ?? "#6366f1");
+    setLauncherButtonColor(selectedBot?.widgets?.button_color ?? "#4f46e5");
+    setLauncherIconColor((selectedBot?.widgets as any)?.text_color ?? "#ffffff");
     setBotName(selectedBot?.widgets?.title ?? "Chat Pilot Assistant");
     setAvatarUrl((selectedBot as any)?.avatar_url ?? "");
     setWelcomeMessage(selectedBot?.widgets?.greeting_message ?? "");
-    const domainsRaw: any = (selectedBot as any)?.bot_settings?.allowed_domains;
-    const parsedDomains = Array.isArray(domainsRaw)
-      ? domainsRaw
-      : typeof domainsRaw === "string"
-        ? domainsRaw
-            .split(",")
-            .map((d: string) => d.trim())
-            .filter(Boolean)
-        : [];
-    setAllowedDomains(parsedDomains.length ? parsedDomains : ["example.com"]);
+    const parsedDomains = parseAllowedDomains(
+      (selectedBot as any)?.bot_settings?.allowed_domains,
+    );
+    setAllowedDomains(parsedDomains);
     setHasChanges(false);
   }
 
@@ -410,13 +463,13 @@ const DeployManager: React.FC = () => {
  ></script>`;
 
   const iframeCode = `<iframe
-  src="${baseUrl}/widget/chat?botId=${botId}&embedded=true"
+  src="${baseUrl}/api/widget/chat?botId=${botId}"
   width="400"
   height="600"
   frameborder="0"
   style="border: none; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);"
   title="${botName}"
-></iframe>`;
+ ></iframe>`;
 
   return (
     <div>
