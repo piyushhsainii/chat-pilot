@@ -18,7 +18,9 @@ const Agents = () => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/dashboard/agents/summary");
+        const res = await fetch("/api/dashboard/agents/summary", {
+          cache: "no-store",
+        });
         if (!res.ok) return;
         const json = (await res.json()) as any;
         if (!cancelled) setSummary(json);
@@ -81,13 +83,17 @@ const Agents = () => {
           </motion.button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bots && bots.map((bot) => (
-            <BotCard
-              key={bot.id}
-              bot={bot}
-              stats={summary?.perBot?.[bot.id]}
-            />
-          ))}
+          {bots &&
+            bots.map((bot) => {
+              const botId = String((bot as any)?.id ?? "");
+              return (
+                <BotCard
+                  key={botId}
+                  bot={bot}
+                  stats={botId ? summary?.perBot?.[botId] : undefined}
+                />
+              );
+            })}
         </div>
       </div>
       {showNewAgent && (

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -29,8 +28,6 @@ import {
 } from "recharts";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import {
-  TrendingUp,
-  TrendingDown,
   Activity,
   Users,
   MessageSquare,
@@ -38,7 +35,8 @@ import {
   Target,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
+  Loader2,
+  TrendingUp,
 } from "lucide-react";
 
 type AnalyticsPayload = {
@@ -102,88 +100,35 @@ function fmtDate(s: string | null) {
   return d.toLocaleString();
 }
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 24,
-    },
-  },
-};
-
 const StatCard: React.FC<{
   label: string;
   value: string;
   icon: React.ReactNode;
-  gradient: string;
-  delay?: number;
-}> = ({ label, value, icon, gradient, delay = 0 }) => {
-  const shouldReduceMotion = useReducedMotion();
-
+}> = ({ label, value, icon }) => {
   return (
-    <motion.div
-      // @ts-ignore
-      variants={itemVariants}
-      initial="hidden"
-      animate="visible"
-      whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.02 }}
-      transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      className="group relative"
-    >
-      <div
-        className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xs ${gradient}`}
-      />
-      <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-white to-slate-50/50 shadow-lg shadow-slate-200/50 backdrop-blur-sm">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-                {label}
-              </div>
-              <motion.div
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: delay, type: "spring", stiffness: 200 }}
-                className="text-3xl font-normal tracking-tight bg-gradient-to-br from-slate-900 to-slate-700 bg-clip-text text-transparent"
-              >
-                {value}
-              </motion.div>
+    <Card className="group border border-slate-200/70 bg-white shadow-sm transition-all duration-200 hover:shadow-md hover:border-slate-300">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              {label}
             </div>
-            <motion.div
-              initial={{ rotate: -180, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              transition={{ delay: delay + 0.1, type: "spring", stiffness: 200 }}
-              className={`p-3 rounded-xl ${gradient} shadow-lg`}
-            >
-              <div className="text-white">{icon}</div>
-            </motion.div>
+            <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+              {value}
+            </div>
           </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+          <div className="shrink-0 rounded-lg border border-slate-200/70 bg-slate-50 p-2 text-slate-700 transition-colors duration-200 group-hover:bg-slate-100">
+            {icon}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
 const Analytics: React.FC = () => {
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     let cancelled = false;
@@ -209,51 +154,33 @@ const Analytics: React.FC = () => {
 
   if (error) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="min-h-[400px] flex items-center justify-center"
-      >
-        <Card className="max-w-md border-red-200 bg-red-50/50">
+      <div className="min-h-[400px] flex items-center justify-center">
+        <Card className="max-w-md border border-red-200 bg-red-50/50 shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-red-100">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <CardTitle className="text-red-900">Error Loading Analytics</CardTitle>
+                <CardTitle className="text-red-900 font-medium">
+                  Error Loading Analytics
+                </CardTitle>
                 <CardDescription className="text-red-700">{error}</CardDescription>
               </div>
             </div>
           </CardHeader>
         </Card>
-      </motion.div>
+      </div>
     );
   }
 
   if (!data) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center"
-        >
-          <motion.div
-            animate={{
-              rotate: 360,
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-            className="inline-block mb-4"
-          >
-            <Sparkles className="h-8 w-8 text-indigo-500" />
-          </motion.div>
-          <div className="text-sm font-semibold text-slate-600">Loading analytics...</div>
-        </motion.div>
+        <div className="flex items-center gap-3 text-sm text-slate-600">
+          <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+          <span>Loading analytics...</span>
+        </div>
       </div>
     );
   }
@@ -262,38 +189,32 @@ const Analytics: React.FC = () => {
     {
       label: "Credits Balance",
       value: String(data.credits.balance),
-      icon: <Zap className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-amber-400 to-orange-500",
+      icon: <Zap className="h-4 w-4" />,
     },
     {
       label: "Active Sessions",
       value: String(data.totals.sessions30d),
-      icon: <Users className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-blue-400 to-indigo-500",
+      icon: <Users className="h-4 w-4" />,
     },
     {
       label: "API Calls",
       value: String(data.totals.apiCalls),
-      icon: <Activity className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-violet-400 to-purple-500",
+      icon: <Activity className="h-4 w-4" />,
     },
     {
       label: "Bot Replies",
       value: String(data.totals.botMessages30d),
-      icon: <MessageSquare className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-emerald-400 to-teal-500",
+      icon: <MessageSquare className="h-4 w-4" />,
     },
     {
       label: "User Messages",
       value: String(data.totals.userMessages30d),
-      icon: <MessageSquare className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-cyan-400 to-blue-500",
+      icon: <MessageSquare className="h-4 w-4" />,
     },
     {
       label: "Tool Actions",
       value: String(data.totals.toolActions30d),
-      icon: <Target className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-pink-400 to-rose-500",
+      icon: <Target className="h-4 w-4" />,
     },
     {
       label: "Avg Confidence",
@@ -301,241 +222,184 @@ const Analytics: React.FC = () => {
         data.totals.avgConfidence === null
           ? "-"
           : `${Math.round(data.totals.avgConfidence * 10) / 10}`,
-      icon: <TrendingUp className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-lime-400 to-green-500",
+      icon: <TrendingUp className="h-4 w-4" />,
     },
     {
       label: "Resolved Rate",
       value: pct(data.totals.resolvedRate),
-      icon: <CheckCircle2 className="h-5 w-5" />,
-      gradient: "bg-gradient-to-br from-sky-400 to-blue-500",
+      icon: <CheckCircle2 className="h-4 w-4" />,
     },
   ];
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-8 pb-24"
-    >
+    <div className="space-y-6 pb-20">
       {/* Header */}
-      {/* @ts-ignore */}
-      <motion.div variants={itemVariants} className="relative">
-        <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-3xl" />
-        <div className="relative flex flex-col gap-2">
-          <div className="text-xs uppercase tracking-tight text-indigo-600">
-            Dashboard Overview
-          </div>
-          <h1 className="text-3xl font-normal tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-600 bg-clip-text text-transparent">
+      <div className="flex items-end justify-between gap-6">
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-slate-500">Dashboard</div>
+          <h1 className="text-2xl font-medium tracking-tight text-slate-900">
             Analytics
           </h1>
+          <div className="text-sm text-slate-600">
+            Usage, sessions, and recent activity.
+          </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Low Balance Alert */}
       {lowBalance && (
-        <motion.div
-
-          /* @ts-ignore */
-          variants={itemVariants}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-orange-400/20 rounded-2xl blur-xl" />
-          <div className="relative rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/50 p-6 shadow-lg">
-            <div className="flex items-start gap-4">
-              <motion.div
-                animate={{
-                  scale: [1, 1.2, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className="p-3 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg"
-              >
-                <AlertTriangle className="h-6 w-6 text-white" />
-              </motion.div>
-              <div className="flex-1">
-                <div className="text-lg font-normal text-amber-900">Low Balance Alert</div>
-                <div className="text-amber-800 mt-1">
-                  You have{" "}
-                  <span className="font-normal text-amber-900">{data.credits.balance}</span>{" "}
-                  credits remaining. Each bot reply consumes 1 credit.
+        <Card className="border border-amber-200/70 bg-amber-50/40 shadow-sm">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-lg border border-amber-200 bg-amber-100/60 p-2 text-amber-800">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-amber-900">
+                  Low balance
+                </div>
+                <div className="mt-0.5 text-sm text-amber-900/80">
+                  You have <span className="font-medium">{data.credits.balance}</span> credits remaining.
                 </div>
               </div>
             </div>
-          </div>
-        </motion.div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Stats Grid */}
-      <motion.div
-        variants={containerVariants}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
           <StatCard
             key={i}
             label={stat.label}
             value={stat.value}
             icon={stat.icon}
-            gradient={stat.gradient}
-            delay={i * 0.05}
           />
         ))}
-      </motion.div>
+      </div>
 
       {/* Charts Row */}
-      <motion.div
-        variants={containerVariants}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-      >
-        {/* @ts-ignore */}
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-xl shadow-slate-200/50 bg-gradient-to-br from-white to-slate-50/50 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border border-slate-200/70 bg-white shadow-sm">
             <CardHeader>
-              <CardTitle className="text-xl font-black tracking-tight">API Calls</CardTitle>
-              <CardDescription className="font-medium">Last 7 days activity</CardDescription>
+              <CardTitle className="text-base font-medium tracking-tight">API Calls</CardTitle>
+              <CardDescription>Last 7 days</CardDescription>
             </CardHeader>
-            <CardContent className="pt-5">
+            <CardContent className="pt-4">
               <div className="h-64">
-                <ChartContainer config={{ apiCalls: { label: "API calls", color: "#6366f1" } }}>
+                <ChartContainer config={{ apiCalls: { label: "API calls", color: "#475569" } }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.series7d}>
-                      <defs>
-                        <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8} />
-                          <stop offset="100%" stopColor="#6366f1" stopOpacity={0.3} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <CartesianGrid vertical={false} stroke="#e2e8f0" strokeOpacity={0.6} />
                       <XAxis
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }}
+                        tick={{ fill: "#64748b", fontSize: 12 }}
                       />
                       <YAxis
                         axisLine={false}
                         tickLine={false}
                         allowDecimals={false}
-                        tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }}
+                        tick={{ fill: "#64748b", fontSize: 12 }}
                       />
                       <Tooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="apiCalls" fill="url(#barGradient)" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="apiCalls" fill="#475569" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               </div>
             </CardContent>
           </Card>
-        </motion.div>
-        {/* @ts-ignore */}
 
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-xl shadow-slate-200/50 bg-gradient-to-br from-white to-slate-50/50">
+        <Card className="border border-slate-200/70 bg-white shadow-sm">
             <CardHeader>
-              <CardTitle className="text-xl font-black tracking-tight">Per-Agent Usage</CardTitle>
-              <CardDescription className="font-medium">
-                30 days; based on saved chat logs
-              </CardDescription>
+              <CardTitle className="text-base font-medium tracking-tight">
+                Per-Agent Usage
+              </CardTitle>
+              <CardDescription>Last 30 days (from saved chat logs)</CardDescription>
             </CardHeader>
-            <CardContent className="pt-5">
-              <ScrollArea className="max-h-[320px] rounded-xl border-2 border-slate-100/50">
+            <CardContent className="pt-4">
+              <ScrollArea className="max-h-[320px] rounded-xl border border-slate-200/60">
                 <Table className="min-w-[520px] table-fixed">
-                  <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm">
-                    <TableRow className="hover:bg-white border-b-2 border-slate-100">
-                      <TableHead className="w-[40%] font-black text-slate-700">Agent</TableHead>
-                      <TableHead className="font-black text-slate-700">API calls</TableHead>
-                      <TableHead className="font-black text-slate-700">Avg conf.</TableHead>
-                      <TableHead className="font-black text-slate-700">Resolved</TableHead>
+                  <TableHeader className="sticky top-0 bg-white">
+                    <TableRow className="border-b border-slate-200/70">
+                      <TableHead className="w-[40%] font-medium text-slate-600">
+                        Agent
+                      </TableHead>
+                      <TableHead className="font-medium text-slate-600">API calls</TableHead>
+                      <TableHead className="font-medium text-slate-600">Avg conf.</TableHead>
+                      <TableHead className="font-medium text-slate-600">Resolved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.perBot.map((b, idx) => (
-                      <motion.tr
+                      <TableRow
                         key={b.botId}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="group hover:bg-indigo-50/50 transition-colors"
+                        className={`${idx % 2 ? "bg-slate-50/30" : "bg-white"} hover:bg-slate-50 transition-colors`}
                       >
-                        <TableCell className="font-bold text-slate-900">
+                        <TableCell className="font-medium text-slate-900">
                           <div className="max-w-[260px] truncate" title={b.name}>
                             {b.name}
                           </div>
                         </TableCell>
-                        <TableCell className="font-semibold text-slate-700">
+                        <TableCell className="text-slate-700">
                           {b.apiCalls30d}
                         </TableCell>
-                        <TableCell className="font-semibold text-slate-700">
+                        <TableCell className="text-slate-700">
                           {b.avgConfidence30d === null
                             ? "-"
                             : `${Math.round(b.avgConfidence30d * 10) / 10}`}
                         </TableCell>
-                        <TableCell className="font-semibold text-slate-700">
+                        <TableCell className="text-slate-700">
                           {pct(b.resolvedRate30d)}
                         </TableCell>
-                      </motion.tr>
+                      </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </ScrollArea>
             </CardContent>
           </Card>
-        </motion.div>
-      </motion.div>
+      </div>
 
       {/* Additional Tables Row */}
-      <motion.div
-        variants={containerVariants}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-      >
-        {/* @ts-ignore */}
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-xl shadow-slate-200/50 bg-gradient-to-br from-white to-slate-50/50">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border border-slate-200/70 bg-white shadow-sm">
             <CardHeader>
-              <CardTitle className="text-xl font-black tracking-tight">Apps Used</CardTitle>
-              <CardDescription className="font-medium">
-                30 days; tool usage (Google Calendar / Calendly)
-              </CardDescription>
+              <CardTitle className="text-base font-medium tracking-tight">Apps Used</CardTitle>
+              <CardDescription>Last 30 days (tool usage)</CardDescription>
             </CardHeader>
-            <CardContent className="pt-5">
+            <CardContent className="pt-4">
               {!data.toolUsage30d.length ? (
-                <div className="text-sm font-medium text-slate-500 py-8 text-center">
+                <div className="text-sm text-slate-600 py-8 text-center">
                   No tool actions recorded.
                 </div>
               ) : (
-                <ScrollArea className="max-h-[260px] rounded-xl border-2 border-slate-100/50">
+                <ScrollArea className="max-h-[260px] rounded-xl border border-slate-200/60">
                   <Table className="min-w-[420px] table-fixed">
-                    <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm">
-                      <TableRow className="hover:bg-white border-b-2 border-slate-100">
-                        <TableHead className="w-[70%] font-black text-slate-700">App</TableHead>
-                        <TableHead className="font-black text-slate-700">Calls</TableHead>
+                    <TableHeader className="sticky top-0 bg-white">
+                      <TableRow className="border-b border-slate-200/70">
+                        <TableHead className="w-[70%] font-medium text-slate-600">App</TableHead>
+                        <TableHead className="font-medium text-slate-600">Calls</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {data.toolUsage30d.map((r, idx) => (
-                        <motion.tr
+                        <TableRow
                           key={r.provider}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.05 }}
-                          className="group hover:bg-emerald-50/50 transition-colors"
+                          className={`${idx % 2 ? "bg-slate-50/30" : "bg-white"} hover:bg-slate-50 transition-colors`}
                         >
-                          <TableCell className="font-bold text-slate-900">
+                          <TableCell className="font-medium text-slate-900">
                             <div className="max-w-[320px] truncate" title={r.provider}>
                               {r.provider}
                             </div>
                           </TableCell>
-                          <TableCell className="font-semibold text-slate-700">
+                          <TableCell className="text-slate-700">
                             {r.calls}
                           </TableCell>
-                        </motion.tr>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -543,57 +407,49 @@ const Analytics: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </motion.div>
-        {/* @ts-ignore */}
 
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-xl shadow-slate-200/50 bg-gradient-to-br from-white to-slate-50/50">
+        <Card className="border border-slate-200/70 bg-white shadow-sm">
             <CardHeader>
-              <CardTitle className="text-xl font-black tracking-tight">
-                Recent Sessions
-              </CardTitle>
-              <CardDescription className="font-medium">Last 25 widget sessions</CardDescription>
+              <CardTitle className="text-base font-medium tracking-tight">Recent Sessions</CardTitle>
+              <CardDescription>Last 25 widget sessions</CardDescription>
             </CardHeader>
-            <CardContent className="pt-5">
+            <CardContent className="pt-4">
               {!data.recentSessions.length ? (
-                <div className="text-sm font-medium text-slate-500 py-8 text-center">
+                <div className="text-sm text-slate-600 py-8 text-center">
                   No sessions yet.
                 </div>
               ) : (
-                <ScrollArea className="max-h-[320px] rounded-xl border-2 border-slate-100/50">
+                <ScrollArea className="max-h-[320px] rounded-xl border border-slate-200/60">
                   <Table className="min-w-[620px] table-fixed">
-                    <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm">
-                      <TableRow className="hover:bg-white border-b-2 border-slate-100">
-                        <TableHead className="w-[30%] font-black text-slate-700">Bot</TableHead>
-                        <TableHead className="font-black text-slate-700">Session</TableHead>
-                        <TableHead className="font-black text-slate-700">Type</TableHead>
-                        <TableHead className="font-black text-slate-700">Created</TableHead>
+                    <TableHeader className="sticky top-0 bg-white">
+                      <TableRow className="border-b border-slate-200/70">
+                        <TableHead className="w-[30%] font-medium text-slate-600">Bot</TableHead>
+                        <TableHead className="font-medium text-slate-600">Session</TableHead>
+                        <TableHead className="font-medium text-slate-600">Type</TableHead>
+                        <TableHead className="font-medium text-slate-600">Created</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {data.recentSessions.map((s, idx) => (
-                        <motion.tr
+                        <TableRow
                           key={s.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.05 }}
-                          className="group hover:bg-blue-50/50 transition-colors"
+                          className={`${idx % 2 ? "bg-slate-50/30" : "bg-white"} hover:bg-slate-50 transition-colors`}
                         >
-                          <TableCell className="font-bold text-slate-900">
+                          <TableCell className="font-medium text-slate-900">
                             <div className="max-w-[220px] truncate" title={s.botName}>
                               {s.botName}
                             </div>
                           </TableCell>
-                          <TableCell className="font-mono text-xs font-semibold text-slate-600">
+                          <TableCell className="font-mono text-xs text-slate-600">
                             {truncate(s.id, 10)}
                           </TableCell>
-                          <TableCell className="font-semibold text-slate-700">
+                          <TableCell className="text-slate-700">
                             {s.isAnonymous ? "Anon" : "Auth"}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap font-medium text-slate-600 text-xs">
+                          <TableCell className="whitespace-nowrap text-slate-600 text-xs">
                             {fmtDate(s.createdAt)}
                           </TableCell>
-                        </motion.tr>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -601,56 +457,49 @@ const Analytics: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </motion.div>
-      </motion.div>
+      </div>
 
-      {/* @ts-ignore */}
-
-      <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-xl shadow-slate-200/50 bg-gradient-to-br from-white to-slate-50/50">
+      <Card className="border border-slate-200/70 bg-white shadow-sm">
           <CardHeader>
-            <CardTitle className="text-xl font-black tracking-tight">Recent Chat Logs</CardTitle>
-            <CardDescription className="font-medium">
+            <CardTitle className="text-base font-medium tracking-tight">Recent Chat Logs</CardTitle>
+            <CardDescription>
               Last 25 messages saved in `chat_logs`
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-5">
+          <CardContent className="pt-4">
             {!data.recentLogs.length ? (
-              <div className="text-sm font-medium text-slate-500 py-8 text-center">
+              <div className="text-sm text-slate-600 py-8 text-center">
                 No chat logs yet.
               </div>
             ) : (
-              <ScrollArea className="max-h-[520px] rounded-xl border-2 border-slate-100/50">
+              <ScrollArea className="max-h-[520px] rounded-xl border border-slate-200/60">
                 <Table className="min-w-[980px] table-fixed">
-                  <TableHeader className="sticky top-0 bg-white/95 backdrop-blur-sm">
-                    <TableRow className="hover:bg-white border-b-2 border-slate-100">
-                      <TableHead className="font-black text-slate-700">Time</TableHead>
-                      <TableHead className="font-black text-slate-700">Bot</TableHead>
-                      <TableHead className="font-black text-slate-700">Env</TableHead>
-                      <TableHead className="font-black text-slate-700">Apps</TableHead>
-                      <TableHead className="font-black text-slate-700">User</TableHead>
-                      <TableHead className="font-black text-slate-700">Bot</TableHead>
+                  <TableHeader className="sticky top-0 bg-white">
+                    <TableRow className="border-b border-slate-200/70">
+                      <TableHead className="font-medium text-slate-600">Time</TableHead>
+                      <TableHead className="font-medium text-slate-600">Bot</TableHead>
+                      <TableHead className="font-medium text-slate-600">Env</TableHead>
+                      <TableHead className="font-medium text-slate-600">Apps</TableHead>
+                      <TableHead className="font-medium text-slate-600">User</TableHead>
+                      <TableHead className="font-medium text-slate-600">Bot</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.recentLogs.map((l, idx) => (
-                      <motion.tr
+                      <TableRow
                         key={l.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.03 }}
-                        className="group hover:bg-violet-50/50 transition-colors"
+                        className={`${idx % 2 ? "bg-slate-50/30" : "bg-white"} hover:bg-slate-50 transition-colors`}
                       >
-                        <TableCell className="whitespace-nowrap font-medium text-slate-600 text-xs">
+                        <TableCell className="whitespace-nowrap text-slate-600 text-xs">
                           {fmtDate(l.createdAt)}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap font-bold text-slate-900">
+                        <TableCell className="whitespace-nowrap font-medium text-slate-900">
                           {l.botName}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap font-semibold text-slate-700">
+                        <TableCell className="whitespace-nowrap text-slate-700">
                           {l.environment ?? "-"}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap font-semibold text-slate-700">
+                        <TableCell className="whitespace-nowrap text-slate-700">
                           <div
                             className="max-w-[220px] truncate"
                             title={l.appsUsed.length ? l.appsUsed.join(", ") : "-"}
@@ -659,16 +508,16 @@ const Analytics: React.FC = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="max-w-[420px] whitespace-normal break-words font-medium text-slate-700">
+                          <div className="max-w-[420px] whitespace-normal break-words text-slate-700">
                             {truncate(l.question, 120)}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="max-w-[460px] whitespace-normal break-words font-medium text-slate-700">
+                          <div className="max-w-[460px] whitespace-normal break-words text-slate-700">
                             {truncate(l.answer, 140)}
                           </div>
                         </TableCell>
-                      </motion.tr>
+                      </TableRow>
                     ))}
                   </TableBody>
                 </Table>
@@ -676,8 +525,7 @@ const Analytics: React.FC = () => {
             )}
           </CardContent>
         </Card>
-      </motion.div>
-    </motion.div>
+    </div>
   )
 }
 

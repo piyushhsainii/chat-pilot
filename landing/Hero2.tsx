@@ -1,6 +1,7 @@
 import React from 'react'
 import Reveal from './Reveal'
 import PrimaryCTA from "@/landing/PrimaryCTA";
+import LaserFlow from '@/components/LaserFlow';
 
 const Hero2 = () => {
     return (
@@ -38,7 +39,7 @@ const Hero2 = () => {
                                     textWaitlist="Join waitlist"
                                     buildChildren={
                                         <>
-                                            <span className="relative z-10">Build your agent</span>
+                                            <span className="relative z-10 ">Build your agent</span>
                                             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                                         </>
                                     }
@@ -49,40 +50,33 @@ const Hero2 = () => {
                                         </>
                                     }
                                 />
-                                <a
+                                {/* <a
                                     href="#"
                                     className="border-2 border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-200 hover:shadow-lg inline-flex h-14 items-center justify-center rounded-full px-8 text-base font-bold text-zinc-900"
                                 >
                                     Book Demo
-                                </a>
+                                </a> */}
                             </div>
                         </Reveal>
 
                         {/* Right column - Video Asset */}
                         <Reveal delayMs={120} className="flex items-center justify-center lg:justify-end">
-                            <div className="relative w-full  ">
+                            <div className="relative w-full  " >
                                 {/* Decorative elements */}
                                 <div className="absolute -inset-4 bg-gradient-to-tr from-blue-100/40 via-indigo-100/40 to-purple-100/40 rounded-[2.5rem] blur-2xl opacity-60" />
                                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-blue-400/30 to-indigo-400/30 rounded-full blur-3xl" />
                                 <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-gradient-to-tr from-purple-400/30 to-pink-400/30 rounded-full blur-3xl" />
 
+                                {/* Your content here */}
                                 {/* Video container */}
-                                <div className="relative z-10  w-full rounded-3xl mt-20 border-2 border-zinc-200/80 bg-white/90 backdrop-blur-sm p-3 shadow-2xl shadow-zinc-900/10">
+                                <div className="relative z-10  w-full rounded-3xl  border-2 border-zinc-200/80 bg-white/90 backdrop-blur-sm p-3 shadow-2xl shadow-zinc-900/10">
                                     <div className="relative w-full h-full rounded-2xl overflow-hidden bg-gradient-to-br from-zinc-50 to-white border border-zinc-200/50">
-                                        {/* <video
-                                            src="/chat-pilot-initial-walkthrough.mp4"
-                                            controls
-                                            muted
-                                            autoPlay
-                                            loop
-                                            playsInline
-                                            className="w-full h-full min-h-[450px] min-w-[500px] object-cover"
-                                        /> */}
                                         <img src="/Hero-final-illustration.png" alt="" className=" aspect-video w-[1200px]  object-contain" />
                                         {/* Overlay gradient */}
                                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-900/5 via-transparent to-transparent" />
                                     </div>
                                 </div>
+
                             </div>
                         </Reveal>
                     </div>

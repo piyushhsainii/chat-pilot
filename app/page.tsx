@@ -16,7 +16,7 @@ import Security from "@/landing/Security";
 import FinalCTA from "@/landing/FinalCTA";
 import Footer from "@/landing/Footer";
 import Hero2 from "@/landing/Hero2";
-
+import Hero3 from "@/landing/Hero3"
 const App: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
 
@@ -33,6 +33,7 @@ const App: React.FC = () => {
       <Navbar scrolled={scrolled} />
       <main>
         <Hero2 />
+        {/* <Hero3 /> */}
         <section id="how">
           <HowItWorks />
         </section>

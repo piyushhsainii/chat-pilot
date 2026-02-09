@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Bot, AlertCircle, CheckCircle2, Settings } from "lucide-react";
+import { BotWithRelations } from "@/lib/types";
 
 // Circular Progress Component
 const CircularProgress: React.FC<{
@@ -38,10 +39,10 @@ const CircularProgress: React.FC<{
                 strokeDashoffset={offset}
                 strokeLinecap="round"
                 className={`transition-all duration-500 ${progress === 100
-                        ? "text-emerald-500"
-                        : progress >= 50
-                            ? "text-amber-400"
-                            : "text-red-400"
+                    ? "text-emerald-500"
+                    : progress >= 50
+                        ? "text-amber-400"
+                        : "text-red-400"
                     }`}
                 style={{
                     transform: "rotate(-90deg)",
@@ -54,7 +55,7 @@ const CircularProgress: React.FC<{
 
 // Bot Card Component
 const BotCard: React.FC<{
-    bot: any;
+    bot: BotWithRelations;
     isSelected: boolean;
     isConfigured: boolean;
     progress: number;
@@ -73,8 +74,8 @@ const BotCard: React.FC<{
                 whileHover={isConfigured ? { scale: 1.05 } : undefined}
                 whileTap={isConfigured ? { scale: 0.95 } : undefined}
                 className={`relative flex flex-col items-center gap-2 p-3 rounded-2xl transition-all ${!isConfigured
-                        ? "cursor-not-allowed opacity-60"
-                        : "cursor-pointer"
+                    ? "cursor-not-allowed opacity-60"
+                    : "cursor-pointer"
                     }`}
             >
                 {/* Circular Progress with Icon */}
@@ -84,10 +85,10 @@ const BotCard: React.FC<{
                     {/* Center Icon */}
                     <div
                         className={`absolute inset-0 flex items-center justify-center rounded-full transition-all ${isSelected
-                                ? "bg-indigo-500 shadow-lg shadow-indigo-200"
-                                : isConfigured
-                                    ? "bg-slate-100 group-hover:bg-slate-200"
-                                    : "bg-red-50"
+                            ? "bg-indigo-500 shadow-lg shadow-indigo-200"
+                            : isConfigured
+                                ? "bg-slate-100 group-hover:bg-slate-200"
+                                : "bg-red-50"
                             }`}
                         style={{
                             width: 68,
@@ -96,14 +97,19 @@ const BotCard: React.FC<{
                             left: 6,
                         }}
                     >
-                        <Bot
-                            className={`h-8 w-8 transition-colors ${isSelected
-                                    ? "text-white"
-                                    : isConfigured
-                                        ? "text-slate-600"
-                                        : "text-red-400"
-                                }`}
-                        />
+                        {
+                            bot.avatar_url ?
+
+                                <img src={bot.avatar_url} alt="" className="rounded-full h-16 w-16 object-cover" /> :
+                                <Bot
+                                    className={`h-8 w-8 transition-colors ${isSelected
+                                        ? "text-white"
+                                        : isConfigured
+                                            ? "text-slate-600"
+                                            : "text-red-400"
+                                        }`}
+                                />
+                        }
                     </div>
 
                     {/* Active Indicator */}
@@ -120,7 +126,7 @@ const BotCard: React.FC<{
                     {/* Config Error Indicator */}
                     {!isConfigured && (
                         <Link
-                            href={`/dashboard/bots/${bot.id}/config`}
+                            href={`/dashboard/agents`}
                             onClick={(e) => e.stopPropagation()}
                             className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-red-500 border-3 border-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors group/error"
                         >
@@ -131,10 +137,10 @@ const BotCard: React.FC<{
                     {/* Progress Percentage */}
                     <div
                         className={`absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[10px] font-black ${progress === 100
-                                ? "bg-emerald-100 text-emerald-700"
-                                : progress >= 50
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-red-100 text-red-700"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : progress >= 50
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-red-100 text-red-700"
                             }`}
                     >
                         {progress}%
@@ -145,10 +151,10 @@ const BotCard: React.FC<{
                 <div className="text-center w-full">
                     <p
                         className={`text-xs font-bold truncate max-w-[100px] transition-colors ${isSelected
-                                ? "text-indigo-600"
-                                : isConfigured
-                                    ? "text-slate-800"
-                                    : "text-slate-500"
+                            ? "text-indigo-600"
+                            : isConfigured
+                                ? "text-slate-800"
+                                : "text-slate-500"
                             }`}
                         title={bot.name}
                     >
@@ -197,10 +203,10 @@ const BotCard: React.FC<{
                                 <span className="font-semibold text-slate-600">Configuration</span>
                                 <span
                                     className={`font-bold ${progress === 100
-                                            ? "text-emerald-600"
-                                            : progress >= 50
-                                                ? "text-amber-600"
-                                                : "text-red-600"
+                                        ? "text-emerald-600"
+                                        : progress >= 50
+                                            ? "text-amber-600"
+                                            : "text-red-600"
                                         }`}
                                 >
                                     {progress}% Complete

@@ -1,5 +1,6 @@
 "use client";
 
+import { LiquidMetalButton } from "@/components/liquid-metal-button";
 import React, { useMemo, useState } from "react";
 
 type Props = {
@@ -64,9 +65,7 @@ export default function WaitlistDialog({
 
   return (
     <>
-      <button type="button" className={triggerClassName} onClick={() => setOpen(true)}>
-        {children ?? triggerText}
-      </button>
+      <LiquidMetalButton onClick={() => setOpen(true)} label={triggerText} />
 
       {open && (
         <div

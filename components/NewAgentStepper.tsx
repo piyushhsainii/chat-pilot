@@ -64,7 +64,6 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
   const [GreetingMessage, setGreetingMessage] = useState<string | null>(
     "Hi, how may i help you!",
   );
-  const [allowed_domains, setAllowed_domains] = useState<string[] | null>(null);
   /* ---------------- WIDGET ---------------- */
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
@@ -77,7 +76,6 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
   const { user, workspaces } = useDashboardStore();
   const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
   const [domainInput, setDomainInput] = useState("");
-  const MAX_DOMAINS = 3;
 
   console.log(workspaces)
 
@@ -118,7 +116,7 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
         bot_id: botId,
         rate_limit: rateLimit,
         rate_limit_hit_message: rateLimitMsg,
-        allowed_domains: allowed_domains,
+        allowed_domains: allowedDomains.length ? allowedDomains : null,
       });
     }
 
@@ -186,41 +184,26 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
     }
   }
 
-  function isValidHttpsDomain(input: string) {
+  function normalizeDomainInput(value: string): string | null {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return null;
     try {
-      const url = new URL(input);
-
-      // Must be https
-      if (url.protocol !== "https:") return false;
-
-      // Must have a valid hostname (example.com, sub.example.co)
-      const domainRegex = /^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
-
-      return domainRegex.test(url.hostname);
+      return new URL(raw).hostname.toLowerCase();
     } catch {
-      return false;
+      try {
+        return new URL(`http://${raw}`).hostname.toLowerCase();
+      } catch {
+        return null;
+      }
     }
-  }
-
-  function normalizeDomain(input: string) {
-    const url = new URL(input);
-    return url.hostname.toLowerCase();
   }
 
   function addDomain() {
-    if (!domainInput.trim()) return;
-
-    if (allowedDomains.length >= MAX_DOMAINS) {
-      alert("You can only add up to 3 domains");
+    const normalized = normalizeDomainInput(domainInput);
+    if (!normalized) {
+      alert("Please enter a valid domain (e.g. myapp.com)");
       return;
     }
-
-    if (!isValidHttpsDomain(domainInput)) {
-      alert("Please enter a valid HTTPS domain (e.g. https://example.com)");
-      return;
-    }
-
-    const normalized = normalizeDomain(domainInput);
 
     if (allowedDomains.includes(normalized)) {
       alert("Domain already added");
@@ -592,7 +575,7 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                       </label>
 
                       <p className="text-xs text-slate-500 pl-1">
-                        Restrict chatbot usage to specific websites (max 3)
+                        Restrict chatbot usage to specific websites.
                       </p>
 
                       {/* Input */}
@@ -614,7 +597,6 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                           type="button"
                           onClick={addDomain}
                           className="px-3 text-xs font-bold rounded-lg bg-slate-900 text-white disabled:opacity-50"
-                          disabled={allowedDomains.length >= MAX_DOMAINS}
                         >
                           Add
                         </button>
@@ -642,7 +624,7 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                       )}
 
                       <p className="text-xs text-slate-400 pl-1">
-                        {allowedDomains.length}/{MAX_DOMAINS} domains added
+                        {allowedDomains.length} domains added
                       </p>
                     </div>
                   </div>

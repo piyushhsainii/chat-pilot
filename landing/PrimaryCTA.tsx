@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { waitlist_toggle } from "@/settings";
 import WaitlistDialog from "@/landing/WaitlistDialog";
+import { LiquidMetalButton } from "@/components/liquid-metal-button";
 
 type Props = {
   className: string;
@@ -35,8 +36,8 @@ export default function PrimaryCTA({
   }
 
   return (
-    <Link href={href} className={className}>
-      {buildChildren ?? textBuild}
-    </Link>
+    // <Link href={href} className={className}>
+    <LiquidMetalButton label={textBuild} viewMode="text" />
+    // </Link>
   );
 }

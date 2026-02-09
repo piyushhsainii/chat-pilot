@@ -32,9 +32,9 @@ function parseAllowedDomains(domainsRaw: any): string[] {
     ? domainsRaw
     : typeof domainsRaw === "string"
       ? domainsRaw
-          .split(",")
-          .map((d: string) => d.trim())
-          .filter(Boolean)
+        .split(",")
+        .map((d: string) => d.trim())
+        .filter(Boolean)
       : [];
 
   const normalized = list
@@ -90,6 +90,9 @@ const DeployManager: React.FC = () => {
     parseAllowedDomains((selectedBot as any)?.bot_settings?.allowed_domains),
   );
   const [domainInput, setDomainInput] = useState("");
+  const [iframeSnippetType, setIframeSnippetType] = useState<
+    "html" | "react" | "webflow"
+  >("html");
 
   function updateBotInStore(patch: {
     id: string;
@@ -187,8 +190,11 @@ const DeployManager: React.FC = () => {
       setDomainInput("");
       return;
     }
-    setAllowedDomains([...allowedDomains, next]);
+
+    const nextDomains = [...allowedDomains, next];
+    setAllowedDomains(nextDomains);
     setDomainInput("");
+    void persistAllowedDomains(nextDomains);
   }
 
   useEffect(() => {
@@ -255,7 +261,39 @@ const DeployManager: React.FC = () => {
 
 
   function removeDomain(domain: string) {
-    setAllowedDomains(allowedDomains.filter((d) => d !== domain));
+    const nextDomains = allowedDomains.filter((d) => d !== domain);
+    setAllowedDomains(nextDomains);
+    void persistAllowedDomains(nextDomains);
+  }
+
+  async function persistAllowedDomains(nextDomains: string[]) {
+    if (!selectedBot?.id) return;
+
+    const { error } = await supabase
+      .from("bot_settings")
+      .upsert(
+        {
+          bot_id: selectedBot.id,
+          allowed_domains: nextDomains.length ? nextDomains : null,
+        } as any,
+        { onConflict: "bot_id" },
+      );
+
+    if (error) {
+      console.error("Bot settings domain save error:", error);
+      toast(error?.message ?? "Failed to save authorized domains");
+      return;
+    }
+
+    updateBotInStore({
+      id: selectedBot.id,
+      bot_settings: {
+        ...(selectedBot as any)?.bot_settings,
+        allowed_domains: nextDomains.length ? nextDomains : null,
+      },
+    });
+
+    setOriginalConfig((prev) => ({ ...prev, allowedDomains: nextDomains }));
   }
 
   const getBotConfigChecks = (bot: any): ConfigCheck[] => {
@@ -315,7 +353,7 @@ const DeployManager: React.FC = () => {
       avatarUrl !== (originalConfig as any).avatarUrl ||
       welcomeMessage !== originalConfig.welcomeMessage ||
       JSON.stringify(allowedDomains) !==
-        JSON.stringify(originalConfig.allowedDomains);
+      JSON.stringify(originalConfig.allowedDomains);
     setHasChanges(hasChanged);
 
     // Clear success message when user makes new changes
@@ -462,14 +500,38 @@ const DeployManager: React.FC = () => {
   defer
  ></script>`;
 
-  const iframeCode = `<iframe
-  src="${baseUrl}/api/widget/chat?botId=${botId}"
+  const iframeSrc = `${baseUrl}/api/widget/chat?botId=${encodeURIComponent(botId)}`;
+
+  const getIframeEmbedCode = (
+    type: "html" | "react" | "webflow",
+  ) => {
+    if (type === "react") {
+      return `<iframe
+  src="${iframeSrc}"
+  width={400}
+  height={600}
+  frameBorder={0}
+  style={{
+    border: "none",
+    borderRadius: 24,
+    boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
+  }}
+  title="${botName}"
+/>`;
+    }
+
+    // Webflow uses an HTML embed block, so same snippet.
+    return `<iframe
+  src="${iframeSrc}"
   width="400"
   height="600"
   frameborder="0"
   style="border: none; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);"
   title="${botName}"
- ></iframe>`;
+></iframe>`;
+  };
+
+  const iframeCode = getIframeEmbedCode(iframeSnippetType);
 
   return (
     <div>
@@ -768,12 +830,12 @@ const DeployManager: React.FC = () => {
                 </div>
               )}
 
-              {activeTab === "embed" && (
-                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
-                  <section className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                      Embed Options
-                    </h3>
+                {activeTab === "embed" && (
+                  <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                    <section className="space-y-4">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
+                        Embed Options
+                      </h3>
 
                     <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
                       <div className="flex justify-between items-center mb-4">
@@ -793,10 +855,25 @@ const DeployManager: React.FC = () => {
                     </div>
 
                     <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
-                      <div className="flex justify-between items-center mb-4">
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
-                          iFrame Embed
-                        </span>
+                      <div className="flex items-center justify-between gap-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
+                            iFrame Embed
+                          </span>
+                          <select
+                            value={iframeSnippetType}
+                            onChange={(e) =>
+                              setIframeSnippetType(e.target.value as any)
+                            }
+                            className="h-8 rounded-lg bg-white/10 text-white text-[10px] font-bold px-2 outline-none border border-white/10"
+                            aria-label="Iframe embed type"
+                          >
+                            <option value="html">HTML</option>
+                            <option value="react">React / JSX</option>
+                            <option value="webflow">Webflow</option>
+                          </select>
+                        </div>
+
                         <button
                           onClick={() => navigator.clipboard.writeText(iframeCode)}
                           className="text-[10px] font-bold bg-white/10 text-white px-3 py-1 rounded-lg hover:bg-emerald-600 transition-colors tracking-tighter"
@@ -809,6 +886,21 @@ const DeployManager: React.FC = () => {
                       </code>
                     </div>
 
+                    <div className="rounded-[28px] overflow-hidden shadow-2xl border border-slate-200 w-[400px]">
+                      <iframe
+                        key={`${botId}-${iframeSnippetType}`}
+                        src={iframeSrc}
+                        width={400}
+                        height={600}
+                        frameBorder={0}
+                        style={{
+                          border: "none",
+                          borderRadius: 24,
+                          boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
+                        }}
+                        title={botName}
+                      />
+                    </div>
                     <div className="pt-6 space-y-4">
                       <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
                         Security Whitelist

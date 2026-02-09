@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 const CONNECTOR_LABELS: Record<string, string> = {
   google_calendar: "Google Calendar connected",
   calendly: "Calendly connected",
@@ -48,7 +50,8 @@ export async function GET() {
     return NextResponse.json({ error: wsError.message }, { status: 500 });
   }
 
-  const botIds = (bots ?? []).map((b) => b.id);
+  const botIds = (bots ?? []).map((b) => String((b as any)?.id ?? ""))
+    .filter(Boolean);
 
   const connectorsByBot = new Map<string, string[]>();
   for (const id of botIds) connectorsByBot.set(id, []);
@@ -71,36 +74,39 @@ export async function GET() {
       if (!isConnectorConnected(r)) continue;
       const label = CONNECTOR_LABELS[provider] ?? `${provider} connected`;
 
-      const scopedBotIds = (r as any)?.bot_ids as string[] | null | undefined;
-      const appliesTo = Array.isArray(scopedBotIds) ? scopedBotIds : botIds;
+       const scopedBotIds = (r as any)?.bot_ids as string[] | null | undefined;
+       const appliesTo = (Array.isArray(scopedBotIds) ? scopedBotIds : botIds).map(String);
 
-      for (const botId of appliesTo) {
-        const list = connectorsByBot.get(botId);
-        if (!list) continue;
-        if (!list.includes(label)) list.push(label);
-      }
-    }
-  }
+       for (const botId of appliesTo) {
+         const key = String(botId);
+         const list = connectorsByBot.get(key);
+         if (!list) continue;
+         if (!list.includes(label)) list.push(label);
+       }
+     }
+   }
 
   const perBotEntries = await Promise.all(
     botIds.map(async (botId) => {
+      const botKey = String(botId);
       const { count, error } = await admin
         .from("chat_logs")
         .select("id", { head: true, count: "exact" })
-        .eq("bot_id", botId);
+        .eq("bot_id", botKey);
 
       if (error) {
         return [
-          botId,
-          { totalMessages: 0, connectors: connectorsByBot.get(botId) ?? [] },
+          botKey,
+          { totalMessages: 0, connectors: connectorsByBot.get(botKey) ?? [] },
         ] as const;
       }
 
       return [
-        botId,
+        botKey,
         {
-          totalMessages: count ?? 0,
-          connectors: connectorsByBot.get(botId) ?? [],
+          // Each chat_logs row contains a user question and a bot answer.
+          totalMessages: (count ?? 0) * 2,
+          connectors: connectorsByBot.get(botKey) ?? [],
         },
       ] as const;
     }),
@@ -108,7 +114,8 @@ export async function GET() {
 
   const perBot = Object.fromEntries(perBotEntries);
 
-  return NextResponse.json({
-    perBot,
-  });
+  return NextResponse.json(
+    { perBot },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
