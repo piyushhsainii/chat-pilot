@@ -19,6 +19,61 @@ function WidgetChatContent() {
     const [isFocused, setIsFocused] = useState(false);
     const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const sendSoundCtxRef = useRef<AudioContext | null>(null);
+
+    const playSendSound = () => {
+        try {
+            const Ctx =
+                (window as any).AudioContext ||
+                (window as any).webkitAudioContext ||
+                null;
+            if (!Ctx) return;
+
+            if (!sendSoundCtxRef.current) {
+                sendSoundCtxRef.current = new Ctx();
+            }
+
+            const ctx = sendSoundCtxRef.current;
+            if (!ctx) return;
+
+            if (ctx.state === "suspended") {
+                void ctx.resume().catch(() => undefined);
+            }
+
+            // iMessage-like "sent" pop: fast descending tone with a tight envelope.
+            const now = ctx.currentTime;
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+            gain.connect(ctx.destination);
+
+            const oscA = ctx.createOscillator();
+            oscA.type = "sine";
+            oscA.frequency.setValueAtTime(880, now);
+            oscA.frequency.exponentialRampToValueAtTime(660, now + 0.08);
+            oscA.frequency.exponentialRampToValueAtTime(440, now + 0.18);
+            oscA.connect(gain);
+            oscA.start(now);
+            oscA.stop(now + 0.19);
+
+            const oscB = ctx.createOscillator();
+            oscB.type = "triangle";
+            oscB.frequency.setValueAtTime(1320, now);
+            oscB.frequency.exponentialRampToValueAtTime(990, now + 0.08);
+            oscB.frequency.exponentialRampToValueAtTime(660, now + 0.18);
+            const gainB = ctx.createGain();
+            gainB.gain.setValueAtTime(0.0001, now);
+            gainB.gain.exponentialRampToValueAtTime(0.035, now + 0.008);
+            gainB.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+            oscB.connect(gainB);
+            gainB.connect(ctx.destination);
+            oscB.start(now);
+            oscB.stop(now + 0.13);
+        } catch {
+            // ignore
+        }
+    };
 
     const toCssColor = (value: any, fallback: string) => {
         if (!value || typeof value !== "string") return fallback;
@@ -189,13 +244,15 @@ function WidgetChatContent() {
                         window.parent.postMessage(
                             {
                                 type: "chatpilot:config",
-                                payload: {
-                                    title: data?.widget?.title ?? data?.bot?.name ?? data?.title ?? data?.name ?? null,
-                                    primary_color: data?.widget?.primary_color ?? null,
-                                    button_color: data?.widget?.button_color ?? null,
-                                    text_color: data?.widget?.text_color ?? null,
-                                },
-                            },
+                                    payload: {
+                                      title: data?.widget?.title ?? data?.bot?.name ?? data?.title ?? data?.name ?? null,
+                                      primary_color: data?.widget?.primary_color ?? null,
+                                      button_color: data?.widget?.button_color ?? null,
+                                      text_color: data?.widget?.text_color ?? null,
+                                      launcher_surface: data?.widget?.launcher_surface ?? null,
+                                      panel_surface: data?.widget?.panel_surface ?? null,
+                                    },
+                                  },
                             "*",
                         );
                     }
@@ -239,12 +296,14 @@ function WidgetChatContent() {
                         {
                             type: "chatpilot:config",
                             payload: {
-                                title: config?.widget?.title ?? config?.bot?.name ?? null,
-                                primary_color: config?.widget?.primary_color ?? null,
-                                button_color: config?.widget?.button_color ?? null,
-                                text_color: config?.widget?.text_color ?? null,
+                              title: config?.widget?.title ?? config?.bot?.name ?? null,
+                              primary_color: config?.widget?.primary_color ?? null,
+                              button_color: config?.widget?.button_color ?? null,
+                              text_color: config?.widget?.text_color ?? null,
+                              launcher_surface: config?.widget?.launcher_surface ?? null,
+                              panel_surface: config?.widget?.panel_surface ?? null,
                             },
-                        },
+                          },
                         "*",
                     );
                 }
@@ -271,6 +330,9 @@ function WidgetChatContent() {
             || null;
 
         const trimmedText = text.trim();
+
+        // Sound should play on the user gesture (click/enter) that triggers sendMessage.
+        playSendSound();
 
         const historyForApi = messages
             .filter((m) => !m?.isError)

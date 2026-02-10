@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
   Database,
@@ -58,88 +58,59 @@ const STEPS: HowStep[] = [
 
 /* ---------------- STEP ITEM ---------------- */
 
-const StepItem = ({
+const StepItem = React.memo(({
   step,
   idx,
   isActive,
-  onEnterView,
   scrollTo,
-  setRef,
 }: {
   step: HowStep;
   idx: number;
   isActive: boolean;
-  onEnterView: (idx: number) => void;
   scrollTo: (idx: number) => void;
-  setRef: (el: HTMLDivElement | null) => void;
 }) => {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  const inView = useInView(ref, {
-    margin: "-45% 0px -45% 0px",
-    amount: 0.5,
-  });
-
-  useEffect(() => {
-    if (inView) onEnterView(idx);
-  }, [inView, idx, onEnterView]);
-
   return (
-    <div
-      ref={(el) => {
-        ref.current = el;
-        setRef(el);
-      }}
-    >
-      <button onClick={() => scrollTo(idx)} className="w-full text-left">
-        {/* Header */}
-        <div className="flex items-start gap-4 py-6">
-          <motion.span
-            animate={{ rotate: isActive ? 0 : 90 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            className="text-3xl font-light text-slate-500 leading-none"
-          >
-            {isActive ? "−" : "+"}
-          </motion.span>
+    <button onClick={() => scrollTo(idx)} className="w-full text-left">
+      <div className="flex items-start gap-4 py-6">
+        <motion.span
+          animate={{ rotate: isActive ? 0 : 90 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="text-3xl font-light text-slate-500 leading-none"
+        >
+          {isActive ? "−" : "+"}
+        </motion.span>
 
-          <h3
-            className={`text-xl md:text-2xl transition-colors ${isActive ? "text-slate-900" : "text-slate-400"
-              }`}
-          >
-            {step.title}
-          </h3>
+        <h3
+          className={`text-xl md:text-2xl transition-colors ${isActive ? "text-slate-900" : "text-slate-400"
+            }`}
+        >
+          {step.title}
+        </h3>
+      </div>
+
+      <motion.div
+        animate={{ height: isActive ? "auto" : 0, opacity: isActive ? 1 : 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="overflow-hidden"
+      >
+        <div className="pb-6">
+          <p className="text-slate-600 max-w-[46ch] leading-relaxed">
+            {step.desc}
+          </p>
         </div>
+      </motion.div>
 
-        {/* Description */}
-        <AnimatePresence initial={false}>
-          {isActive && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.45, ease: "easeOut" }}
-              className="overflow-hidden"
-            >
-              <div className="pb-6">
-                <p className="text-slate-600 max-w-[46ch] leading-relaxed">
-                  {step.desc}
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="border-b border-slate-200" />
-      </button>
-    </div>
+      <div className="border-b border-slate-200" />
+    </button>
   );
-};
+});
+
 
 /* ---------------- VISUAL PANEL ---------------- */
 
 const VisualPanel = ({ step }: { step: HowStep }) => {
   return (
-    <div className="sticky top-24 h-[520px] rounded-3xl border bg-white shadow-xl overflow-hidden">
+    <div className="h-[520px] rounded-3xl border bg-white shadow-xl overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.img
           key={step.id}
@@ -160,48 +131,112 @@ const VisualPanel = ({ step }: { step: HowStep }) => {
 
 const HowItWorks = () => {
   const [activeStep, setActiveStep] = useState(0);
-  const refs = useRef<(HTMLDivElement | null)[]>([]);
+  const sectionRef = useRef<HTMLDivElement | null>(null);
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const active = useMemo(() => STEPS[activeStep], [activeStep]);
 
-  // 🔑 Scroll decides active step
-  const onEnterView = useCallback((idx: number) => {
-    setActiveStep((prev) => (prev === idx ? prev : idx));
-  }, []);
-
   // 🔑 Click only scrolls
   const scrollTo = useCallback((idx: number) => {
-    const el = refs.current[idx];
+    const isLg = window.matchMedia("(min-width: 1024px)").matches;
+
+    if (isLg && sectionRef.current) {
+      const top =
+        sectionRef.current.getBoundingClientRect().top + window.scrollY;
+      const height = sectionRef.current.offsetHeight;
+      const max = Math.max(1, height - window.innerHeight);
+      const p = (idx + 0.5) / STEPS.length;
+      window.scrollTo({ top: top + p * max, behavior: "smooth" });
+      return;
+    }
+
+    const el = stepRefs.current[idx];
     if (!el) return;
-
-    const y =
-      window.scrollY +
-      el.getBoundingClientRect().top -
-      window.innerHeight * 0.35;
-
+    const y = window.scrollY + el.getBoundingClientRect().top - 24;
     window.scrollTo({ top: y, behavior: "smooth" });
   }, []);
 
-  return (
-    <section className="py-24 bg-gradient-to-b from-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16">
-        {/* LEFT */}
-        <div>
-          {STEPS.map((step, idx) => (
-            <StepItem
-              key={step.id}
-              step={step}
-              idx={idx}
-              isActive={idx === activeStep}
-              onEnterView={onEnterView}
-              scrollTo={scrollTo}
-              setRef={(el) => (refs.current[idx] = el)}
-            />
-          ))}
-        </div>
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    let raf = 0;
 
-        {/* RIGHT */}
-        <VisualPanel step={active} />
+    const update = () => {
+      if (!mq.matches) return;
+      const el = sectionRef.current;
+      if (!el) return;
+
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const height = el.offsetHeight;
+      const max = Math.max(1, height - window.innerHeight);
+      const y = window.scrollY - top;
+      const p = Math.min(1, Math.max(0, y / max));
+      const idx = Math.min(STEPS.length - 1, Math.floor(p * STEPS.length));
+      setActiveStep((prev) => (prev === idx ? prev : idx));
+    };
+
+    const onScroll = () => {
+      if (!mq.matches) return;
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(update);
+    };
+
+    const onMqChange = () => {
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(update);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+
+    if ("addEventListener" in mq) mq.addEventListener("change", onMqChange);
+    // @ts-expect-error - Safari
+    else mq.addListener(onMqChange);
+
+    update();
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if ("removeEventListener" in mq)
+        mq.removeEventListener("change", onMqChange);
+      // @ts-expect-error - Safari
+      else mq.removeListener(onMqChange);
+    };
+  }, []);
+
+
+  return (
+    <section className="bg-gradient-to-b from-white to-slate-50">
+      <div className="max-w-7xl mx-auto px-6">
+        <div ref={sectionRef} className="relative lg:min-h-[250vh]">
+          <div className="py-16 lg:sticky lg:top-0 lg:flex lg:h-screen lg:items-center">
+            <div className="w-full grid lg:grid-cols-2 gap-16">
+              {/* LEFT */}
+              <div className="order-2 lg:order-1">
+                {STEPS.map((step, idx) => (
+                  <div
+                    key={step.id}
+                    ref={(el) => {
+                      stepRefs.current[idx] = el;
+                    }}
+                  >
+                    <StepItem
+                      step={step}
+                      idx={idx}
+                      isActive={idx === activeStep}
+                      scrollTo={scrollTo}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* RIGHT */}
+              <div className="order-1 lg:order-2">
+                <VisualPanel step={active} />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

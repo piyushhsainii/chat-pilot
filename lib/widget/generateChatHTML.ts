@@ -6,6 +6,8 @@ type GenerateChatHTMLParams = {
   textColor: string; // hex with or without #
   welcomeMessage: string;
   embedded: boolean;
+  launcherSurface?: "solid" | "glass" | "liquid";
+  panelSurface?: "solid" | "glass";
 };
 
 function normalizeHexNoHash(input: string, fallback: string) {
@@ -22,6 +24,8 @@ export function generateChatHTML({
   textColor,
   welcomeMessage,
   embedded,
+  launcherSurface = "glass",
+  panelSurface = "solid",
 }: GenerateChatHTMLParams) {
   const primaryNoHash = normalizeHexNoHash(primary, "");
   const textNoHash = normalizeHexNoHash(textColor, "ffffff");
@@ -43,6 +47,8 @@ export function generateChatHTML({
         primary: "#${primaryNoHash}",
         textColor: "#${textNoHash}",
         welcomeMessage: "${welcomeMessage}",
+        launcherSurface: "${launcherSurface}",
+        panelSurface: "${panelSurface}",
         embedded: ${embedded}
       };
     </script>

@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     .from("knowledge_sources" as any)
     .select("name, type, status, doc_url")
     .eq("bot_id", botId)
-    .neq("status", "failed")
+    .or("status.is.null,status.neq.failed")
     .order("created_at", { ascending: false });
 
   const { contextText } = await buildKnowledgeContextForQuery(

@@ -1,57 +1,15 @@
 import { createClient } from "../supabase/server";
-
-function hostnameFromUrlLike(value?: string | null): string | null {
-  if (!value) return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-
-  // Accept full URLs (https://example.com/page) or origins (https://example.com)
-  // and also handle bare domains (example.com, localhost:3000).
-  try {
-    return new URL(raw).hostname.toLowerCase();
-  } catch {
-    try {
-      return new URL(`http://${raw}`).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-}
-
-function normalizeAllowedDomain(value: string): string | null {
-  const v = String(value || "").trim().toLowerCase();
-  if (!v) return null;
-
-  // Support entries like:
-  // - example.com
-  // - https://example.com
-  // - *.example.com
-  if (v.startsWith("*.")) {
-    const base = hostnameFromUrlLike(v.slice(2));
-    return base ? `*.${base}` : null;
-  }
-
-  return hostnameFromUrlLike(v);
-}
-
-function isHostnameAllowed(hostname: string, allowedDomains: string[]) {
-  const h = hostname.toLowerCase();
-  return allowedDomains.some((allowedRaw) => {
-    const allowed = normalizeAllowedDomain(allowedRaw);
-    if (!allowed) return false;
-
-    if (allowed.startsWith("*.")) {
-      const base = allowed.slice(2);
-      return h === base || h.endsWith(`.${base}`);
-    }
-
-    return h === allowed || h.endsWith(`.${allowed}`);
-  });
-}
+import {
+  hasLocalhostInAllowedDomains,
+  hostnameFromUrlLike,
+  isHostnameAllowed,
+  isLocalhostHostname,
+} from "./allowedDomains";
 
 export async function validateBot(
   botId: string,
   originOrReferer?: string | null,
+  requestHostname?: string | null,
 ) {
   const supabaseServer = await createClient();
 
@@ -70,7 +28,9 @@ export async function validateBot(
         theme,
         primary_color,
         button_color,
-        text_color
+        text_color,
+        launcher_surface,
+        panel_surface
       ),
       bot_settings (
         allowed_domains
@@ -89,10 +49,23 @@ export async function validateBot(
   if (!allowedDomains.length) return data;
 
   // If domains are configured, require a request origin/referrer we can validate.
+  const allowLocalhost = hasLocalhostInAllowedDomains(allowedDomains);
   const hostname = hostnameFromUrlLike(originOrReferer);
-  if (!hostname) return null;
 
-  if (!isHostnameAllowed(hostname, allowedDomains)) return null;
+  if (hostname) {
+    if (allowLocalhost && isLocalhostHostname(hostname)) return data;
+    if (!isHostnameAllowed(hostname, allowedDomains)) return null;
+    return data;
+  }
+
+  // Some script/iframe embeds can omit Origin/Referer due to host Referrer-Policy.
+  // If the bot explicitly allows localhost and the request is served from localhost,
+  // treat it as allowed for local development.
+  if (allowLocalhost && requestHostname && isLocalhostHostname(requestHostname)) {
+    return data;
+  }
+
+  return null;
 
   return data;
 }

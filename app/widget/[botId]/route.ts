@@ -11,6 +11,7 @@ export async function GET(
   const bot = await validateBot(
     botId,
     req.headers.get("origin") || req.headers.get("referer"),
+    req.nextUrl.hostname,
   );
   if (!bot) {
     return new NextResponse("Unauthorized", { status: 403 });
@@ -24,6 +25,8 @@ export async function GET(
     textColor: bot.widgets?.text_color || "ffffff",
     embedded: false,
     welcomeMessage: bot.widgets?.greeting_message || "Hi! How can I help you?",
+    launcherSurface: (bot.widgets as any)?.launcher_surface ?? "glass",
+    panelSurface: (bot.widgets as any)?.panel_surface ?? "solid",
   });
 
   return new NextResponse(html, {

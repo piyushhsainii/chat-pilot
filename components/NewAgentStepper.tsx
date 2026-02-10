@@ -6,6 +6,7 @@ import { supabase } from "@/services/supabase";
 import { ArrowLeft, X } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboardStore";
 import Link from "next/link";
+import GlassSurface from "@/components/GlassSurface";
 
 const STEPS = [
   { title: "Agent Basics", subtitle: "Name and personality" },
@@ -128,6 +129,8 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
         primary_color: primaryColor,
         button_color: widgetButtonColor,
         text_color: widgetIconColor,
+        launcher_surface: "glass",
+        panel_surface: "solid",
       });
     }
 
@@ -883,35 +886,41 @@ export default function NewAgentStepper({ onClose }: { onClose: () => void }) {
                       </div>
 
                       {/* Trigger Icon - Always Visible Floating Button */}
-                      <button
-                        onClick={() => setisWidgetOpen(!isWidgetOpen)}
-                        className="group w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
-                        style={{
-                          backgroundColor: widgetButtonColor || primaryColor,
-                          color: widgetIconColor,
-                          boxShadow: `0 20px 50px ${(widgetButtonColor || primaryColor)}40`,
-                        }}
-                        aria-label={isWidgetOpen ? "Close chat" : "Open chat"}
+                      <GlassSurface
+                        variant="widgetIcon"
+                        width={64}
+                        height={64}
+                        tint={widgetButtonColor || primaryColor}
+                        tintOpacity={0.2}
+                        className="group z-20 mr-4 mb-4 transition-all duration-500 hover:scale-110 active:scale-95"
                       >
-                        {/* Icon Transition Logic */}
-                        <div
-                          className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-0 scale-50 rotate-90 translate-y-8" : "opacity-100 scale-100 rotate-0 translate-y-0"}`}
+                        <button
+                          onClick={() => setisWidgetOpen(!isWidgetOpen)}
+                          className="relative h-full w-full rounded-full overflow-hidden"
+                          style={{ color: widgetIconColor }}
+                          aria-label={isWidgetOpen ? "Close chat" : "Open chat"}
+                          type="button"
                         >
-                          <span className="text-3xl">💬</span>
-                        </div>
-                        <div
-                          className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-100 scale-100 rotate-0 translate-y-0" : "opacity-0 scale-50 -rotate-90 -translate-y-8"}`}
-                        >
-                          <span className="text-2xl font-bold">✕</span>
-                        </div>
+                          {/* Icon Transition Logic */}
+                          <div
+                            className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-0 scale-50 rotate-90 translate-y-8" : "opacity-100 scale-100 rotate-0 translate-y-0"}`}
+                          >
+                            <span className="text-3xl">💬</span>
+                          </div>
+                          <div
+                            className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-100 scale-100 rotate-0 translate-y-0" : "opacity-0 scale-50 -rotate-90 -translate-y-8"}`}
+                          >
+                            <span className="text-2xl font-bold">✕</span>
+                          </div>
 
-                        {/* Pulsing indicator when closed to attract attention */}
-                        {!isWidgetOpen && (
-                          <span className="absolute top-3 right-3 w-3 h-3 bg-red-500 border-2 border-white rounded-full flex items-center justify-center">
-                            <span className="w-full h-full bg-red-400 rounded-full animate-ping opacity-75"></span>
-                          </span>
-                        )}
-                      </button>
+                          {/* Pulsing indicator when closed to attract attention */}
+                          {!isWidgetOpen && (
+                            <span className="absolute top-3 right-3 flex h-3 w-3 items-center justify-center rounded-full border-2 border-white bg-red-500">
+                              <span className="h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
+                            </span>
+                          )}
+                        </button>
+                      </GlassSurface>
                     </div>
                   </div>
                 )}

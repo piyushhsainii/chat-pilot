@@ -3,8 +3,44 @@
 import { supabase } from "@/services/supabase";
 import { useDashboard } from "@/provider/DashboardContext";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const MAX_FREE_BYTES = 25 * 1024 * 1024;
+const EXTRACTED_DIR = "_extracted";
+const MAX_EXTRACTED_TEXT_CHARS = 2_000_000;
+const SELECTED_BOT_STORAGE_KEY = "chatpilot.selectedBotId";
+
+async function extractTextFromPdf(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as any;
+
+  const task = pdfjs.getDocument({
+    data: new Uint8Array(buf),
+    // Running without a worker keeps this simple in Next.js client builds.
+    disableWorker: true,
+  });
+  const pdf = await task.promise;
+
+  const pages: string[] = [];
+  let totalChars = 0;
+  for (let i = 1; i <= (pdf?.numPages ?? 0); i += 1) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const line = (content?.items ?? [])
+      .map((it: any) => String(it?.str ?? "").trim())
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (line) {
+      pages.push(line);
+      totalChars += line.length;
+      if (totalChars >= MAX_EXTRACTED_TEXT_CHARS) break;
+    }
+  }
+
+  const text = pages.join("\n\n").slice(0, MAX_EXTRACTED_TEXT_CHARS);
+  return text;
+}
 
 type Source = {
   name: string;
@@ -27,6 +63,9 @@ const KnowledgeManager: React.FC<{
   plan?: "free" | "pro";
 }> = ({ plan = "free" }) => {
   const { user, bots } = useDashboard();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const userId = user?.id ?? "test-user";
 
@@ -85,12 +124,12 @@ const KnowledgeManager: React.FC<{
       botId,
       name,
       type,
-      publicUrl,
+      docUrls,
     }: {
       botId: string;
       name: string;
       type: "pdf" | "text";
-      publicUrl: string;
+      docUrls: string[];
     }) => {
       const { data: existing, error: existingError } = await supabase
         .from("knowledge_sources" as any)
@@ -112,7 +151,7 @@ const KnowledgeManager: React.FC<{
       if (existingId) {
         const { data: updated, error: updateError } = await supabase
           .from("knowledge_sources" as any)
-          .update({ doc_url: [publicUrl], status: "processing", type } as any)
+          .update({ doc_url: docUrls, status: "processing", type } as any)
           .select("id")
           .eq("id", existingId);
         if (updateError) throw updateError;
@@ -121,7 +160,7 @@ const KnowledgeManager: React.FC<{
 
       const { data: inserted, error: insertError } = await supabase
         .from("knowledge_sources" as any)
-        .insert({ bot_id: botId, name, type, doc_url: [publicUrl] } as any)
+        .insert({ bot_id: botId, name, type, doc_url: docUrls, status: "processing" } as any)
         .select("id")
         .single();
 
@@ -168,26 +207,34 @@ const KnowledgeManager: React.FC<{
   const loadFiles = useCallback(
     async (path: string) => {
       try {
-        // List files in the specific path
-        const { data, error } = await supabase.storage.from(bucket).list(path, {
-          limit: 100,
-          offset: 0,
-        });
+        const [root, extracted] = await Promise.all([
+          supabase.storage.from(bucket).list(path, { limit: 100, offset: 0 }),
+          supabase.storage
+            .from(bucket)
+            .list(`${path}/${EXTRACTED_DIR}`, { limit: 200, offset: 0 }),
+        ]);
 
-        if (error) {
-          console.error("Error loading files:", error);
+        if (root.error) {
+          console.error("Error loading files:", root.error);
           return;
         }
 
+        if (extracted.error) {
+          // Best-effort: folder may not exist yet.
+          console.warn("Error loading extracted files:", extracted.error);
+        }
+
         const mapped =
-          data?.map((f) => ({
+          root.data?.map((f) => ({
             name: f.name,
             size: f.metadata?.size || 0,
             path: `${path}/${f.name}`,
           })) || [];
 
         setFiles(mapped);
-        setUsedBytes(mapped.reduce((sum, f) => sum + f.size, 0));
+        const extractedBytes =
+          extracted.data?.reduce((sum, f) => sum + (f.metadata?.size || 0), 0) || 0;
+        setUsedBytes(mapped.reduce((sum, f) => sum + f.size, 0) + extractedBytes);
       } catch (err) {
         console.error("Failed to load files:", err);
       }
@@ -199,10 +246,38 @@ const KnowledgeManager: React.FC<{
      Load files from Supabase
   --------------------------------------------- */
   useEffect(() => {
-    if (bots && bots.length > 0 && !selectedBotId) {
-      setSelectedBotId(bots[0].id);
+    if (!bots || bots.length === 0 || selectedBotId) return;
+
+    const paramBotId =
+      searchParams?.get("botId") || searchParams?.get("bot_id") || null;
+    const savedBotId =
+      typeof window === "undefined"
+        ? null
+        : window.localStorage.getItem(SELECTED_BOT_STORAGE_KEY);
+
+    const preferred = paramBotId || savedBotId;
+    const resolved =
+      preferred && bots.some((b: any) => String(b.id) === String(preferred))
+        ? String(preferred)
+        : String(bots[0].id);
+
+    setSelectedBotId(resolved);
+  }, [bots, selectedBotId, searchParams]);
+
+  useEffect(() => {
+    if (!selectedBotId) return;
+
+    try {
+      window.localStorage.setItem(SELECTED_BOT_STORAGE_KEY, selectedBotId);
+    } catch {
+      // ignore
     }
-  }, [bots, selectedBotId]);
+
+    const current = searchParams?.get("botId") || null;
+    if (current !== selectedBotId) {
+      router.replace(`${pathname}?botId=${encodeURIComponent(selectedBotId)}`);
+    }
+  }, [selectedBotId, pathname, router, searchParams]);
 
   useEffect(() => {
     if (!basePath) return;
@@ -221,8 +296,27 @@ const KnowledgeManager: React.FC<{
     if (!basePath) return;
     if (!selectedBotId) return;
     setIsIndexing(true);
+    let nextUsedBytes = usedBytes;
     for (const file of Array.from(fileList)) {
-      if (plan === "free" && usedBytes + file.size > MAX_FREE_BYTES) {
+      const inferredType = getSourceTypeFromName(file.name);
+
+      let extractedTextFile: File | null = null;
+      if (inferredType === "pdf") {
+        try {
+          const extractedText = await extractTextFromPdf(file);
+          if (extractedText.trim()) {
+            const blob = new Blob([extractedText], { type: "text/plain" });
+            extractedTextFile = new File([blob], `${file.name}.txt`, {
+              type: "text/plain",
+            });
+          }
+        } catch (err) {
+          console.warn("Failed to extract text from PDF; falling back to PDF ingestion", err);
+        }
+      }
+
+      const extraBytes = extractedTextFile?.size ?? 0;
+      if (plan === "free" && nextUsedBytes + file.size + extraBytes > MAX_FREE_BYTES) {
         alert("Free plan limit reached (25MB)");
         setIsIndexing(false);
         return;
@@ -251,23 +345,48 @@ const KnowledgeManager: React.FC<{
       }
 
       try {
-        const type = getSourceTypeFromName(file.name);
+        let extractedPublicUrl: string | null = null;
+        if (extractedTextFile) {
+          const extractedPath = `${basePath}/${EXTRACTED_DIR}/${file.name}.txt`;
+          const { error: extractedError } = await supabase.storage
+            .from(bucket)
+            .upload(extractedPath, extractedTextFile, { upsert: true });
+          if (!extractedError) {
+            const { data: extractedPublic } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(extractedPath);
+            extractedPublicUrl = extractedPublic?.publicUrl ?? null;
+          } else {
+            console.warn("Failed to upload extracted text; falling back to PDF ingestion", extractedError);
+          }
+        }
+
+        const sourceType = inferredType;
+        // For PDFs we keep the original PDF stored in Supabase Storage (for user download),
+        // but store the extracted text URL in knowledge_sources.doc_url so the bot can
+        // reliably fetch readable context (and avoid downloading large PDFs at chat-time).
+        const docUrls = extractedPublicUrl ? [extractedPublicUrl] : [publicUrl];
+
         const sourceId = await upsertKnowledgeSource({
           botId: selectedBotId,
           name: file.name,
-          type,
-          publicUrl,
+          type: sourceType,
+          docUrls,
         });
 
         if (sourceId) {
+          const ingestType = extractedPublicUrl ? ("text" as const) : sourceType;
+          const ingestUrl = extractedPublicUrl ? extractedPublicUrl : publicUrl;
           await ingestKnowledgeSource({
             botId: selectedBotId,
             sourceId,
             sourceName: file.name,
-            type,
-            publicUrl,
+            type: ingestType,
+            publicUrl: ingestUrl,
           });
         }
+
+        nextUsedBytes += file.size + (extractedPublicUrl ? extraBytes : 0);
       } catch (e: any) {
         console.error(e);
         alert(e?.message ?? "Failed to save knowledge source");
@@ -328,7 +447,7 @@ const KnowledgeManager: React.FC<{
           botId: selectedBotId,
           name: fileName,
           type: "text",
-          publicUrl,
+          docUrls: [publicUrl],
         });
 
         if (sourceId) {
@@ -358,15 +477,21 @@ const KnowledgeManager: React.FC<{
   /* ---------------------------------------------
      Delete file
   --------------------------------------------- */
-  async function deleteFile(path: string, size: number) {
+  async function deleteFile(path: string, _size: number) {
     if (!selectedBotId) return;
-    const { error } = await supabase.storage.from(bucket).remove([path]);
+    const name = path.split("/").pop() ?? path;
+    const toRemove = [path];
+
+    // If this is a PDF we also remove its extracted text (hidden) companion.
+    if (basePath && name.toLowerCase().endsWith(".pdf")) {
+      toRemove.push(`${basePath}/${EXTRACTED_DIR}/${name}.txt`);
+    }
+
+    const { error } = await supabase.storage.from(bucket).remove(toRemove);
     if (error) {
       alert(error.message);
       return;
     }
-
-    const name = path.split("/").pop() ?? path;
     const { error: deleteRowError } = await supabase
       .from("knowledge_sources" as any)
       .delete()
@@ -376,7 +501,6 @@ const KnowledgeManager: React.FC<{
       console.error("Failed to delete knowledge source row:", deleteRowError);
     }
 
-    setUsedBytes((b) => b - size);
     if (basePath) loadFiles(basePath);
     loadKnowledgeSources(selectedBotId);
   }
@@ -552,7 +676,7 @@ const KnowledgeManager: React.FC<{
           const { data: publicData } = supabase.storage
             .from(bucket)
             .getPublicUrl(f.path);
-          const openUrl = row?.doc_url?.[0] ?? publicData?.publicUrl ?? null;
+          const openUrl = publicData?.publicUrl ?? row?.doc_url?.[0] ?? null;
 
           return (
             <div

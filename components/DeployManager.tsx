@@ -5,6 +5,8 @@ import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import HorizontalBotSelector from "./HorizontalBotSelector";
+import GlassSurface from "@/components/GlassSurface";
+import { LiquidMetalButton } from "@/components/liquid-metal-button";
 
 type ConfigCheck = {
   label: string;
@@ -57,6 +59,12 @@ const DeployManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"content" | "style" | "embed">(
     "style",
   );
+  const [launcherSurface, setLauncherSurface] = useState<
+    "solid" | "glass" | "liquid"
+  >(((selectedBot?.widgets as any)?.launcher_surface as any) ?? "glass");
+  const [panelSurface, setPanelSurface] = useState<"solid" | "glass">(
+    ((selectedBot?.widgets as any)?.panel_surface as any) ?? "solid",
+  );
   const [originalConfig, setOriginalConfig] = useState(() => {
     const parsedDomains = parseAllowedDomains(
       (selectedBot as any)?.bot_settings?.allowed_domains,
@@ -67,6 +75,8 @@ const DeployManager: React.FC = () => {
       primaryColor: selectedBot?.widgets?.primary_color ?? "#6366f1",
       launcherButtonColor: selectedBot?.widgets?.button_color ?? "#4f46e5",
       launcherIconColor: (selectedBot?.widgets as any)?.text_color ?? "#ffffff",
+      launcherSurface: (selectedBot?.widgets as any)?.launcher_surface ?? "glass",
+      panelSurface: (selectedBot?.widgets as any)?.panel_surface ?? "solid",
       botName: selectedBot?.widgets?.title ?? "Chat Pilot Assistant",
       avatarUrl: (selectedBot as any)?.avatar_url ?? "",
       welcomeMessage: selectedBot?.widgets?.greeting_message ?? "",
@@ -233,6 +243,13 @@ const DeployManager: React.FC = () => {
     setWelcomeMessage(
       selectedBot.widgets?.greeting_message ?? ""
     );
+
+    setLauncherSurface(
+      ((selectedBot.widgets as any)?.launcher_surface as any) ?? "glass",
+    );
+    setPanelSurface(
+      ((selectedBot.widgets as any)?.panel_surface as any) ?? "solid",
+    );
     setOriginalConfig({
       theme: ((selectedBot?.widgets?.theme as "light" | "dark") ?? "light") as
         | "light"
@@ -240,6 +257,8 @@ const DeployManager: React.FC = () => {
       primaryColor: selectedBot?.widgets?.primary_color ?? "#6366f1",
       launcherButtonColor: selectedBot?.widgets?.button_color ?? "#4f46e5",
       launcherIconColor: (selectedBot?.widgets as any)?.text_color ?? "#ffffff",
+      launcherSurface: (selectedBot.widgets as any)?.launcher_surface ?? "glass",
+      panelSurface: (selectedBot.widgets as any)?.panel_surface ?? "solid",
       botName: selectedBot?.widgets?.title ?? "Chat Pilot Assistant",
       avatarUrl: (selectedBot as any)?.avatar_url ?? "",
       welcomeMessage: selectedBot?.widgets?.greeting_message ?? "",
@@ -349,6 +368,8 @@ const DeployManager: React.FC = () => {
       primaryColor !== originalConfig.primaryColor ||
       launcherButtonColor !== (originalConfig as any).launcherButtonColor ||
       launcherIconColor !== (originalConfig as any).launcherIconColor ||
+      launcherSurface !== (originalConfig as any).launcherSurface ||
+      panelSurface !== (originalConfig as any).panelSurface ||
       botName !== originalConfig.botName ||
       avatarUrl !== (originalConfig as any).avatarUrl ||
       welcomeMessage !== originalConfig.welcomeMessage ||
@@ -366,6 +387,8 @@ const DeployManager: React.FC = () => {
     primaryColor,
     launcherButtonColor,
     launcherIconColor,
+    launcherSurface,
+    panelSurface,
     botName,
     avatarUrl,
     welcomeMessage,
@@ -391,6 +414,8 @@ const DeployManager: React.FC = () => {
         text_color: launcherIconColor,
         theme: theme,
         title: botName,
+        launcher_surface: launcherSurface,
+        panel_surface: panelSurface,
       };
 
       const { data: widgetRow, error: widgetSaveError } = await supabase
@@ -452,6 +477,8 @@ const DeployManager: React.FC = () => {
         primaryColor,
         launcherButtonColor,
         launcherIconColor,
+        launcherSurface,
+        panelSurface,
         botName,
         avatarUrl,
         welcomeMessage,
@@ -478,6 +505,8 @@ const DeployManager: React.FC = () => {
     setPrimaryColor(selectedBot?.widgets?.primary_color ?? "#6366f1");
     setLauncherButtonColor(selectedBot?.widgets?.button_color ?? "#4f46e5");
     setLauncherIconColor((selectedBot?.widgets as any)?.text_color ?? "#ffffff");
+    setLauncherSurface((selectedBot?.widgets as any)?.launcher_surface ?? "glass");
+    setPanelSurface((selectedBot?.widgets as any)?.panel_surface ?? "solid");
     setBotName(selectedBot?.widgets?.title ?? "Chat Pilot Assistant");
     setAvatarUrl((selectedBot as any)?.avatar_url ?? "");
     setWelcomeMessage(selectedBot?.widgets?.greeting_message ?? "");
@@ -495,8 +524,11 @@ const DeployManager: React.FC = () => {
     .replace(/\/+$/, "");
 
   const embedCode = `<script
-  src="${baseUrl}/widget.js"
+  src="${baseUrl}/v1/widget.js"
   data-bot-id="${botId}"
+  data-base-url="${baseUrl}"
+  data-launcher-surface="${launcherSurface}"
+  data-panel-surface="${panelSurface}"
   defer
  ></script>`;
 
@@ -586,42 +618,7 @@ const DeployManager: React.FC = () => {
                 ))}
               </div>
 
-              {selectedBot && (
-                <div className="mt-3 grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
-                      Avatar URL
-                    </label>
-                    <input
-                      type="url"
-                      value={avatarUrl}
-                      onChange={(e) => setAvatarUrl(e.target.value)}
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-slate-50 font-medium tracking-tighter text-sm"
-                      placeholder="https://..."
-                    />
-                  </div>
 
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
-                      Upload Avatar Image
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingAvatar}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.currentTarget.value = "";
-                        if (file) uploadAvatarImage(file);
-                      }}
-                      className="block w-full text-xs"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1 tracking-tighter">
-                      Uploads to Supabase Storage bucket `knowledge-files`.
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-10">
@@ -723,7 +720,31 @@ const DeployManager: React.FC = () => {
                       </button>
                     </div>
                   </section>
-
+                  <section>
+                    {selectedBot && (
+                      <div className="mt-3 grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                            Upload Avatar Image
+                          </label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={isUploadingAvatar}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.currentTarget.value = "";
+                              if (file) uploadAvatarImage(file);
+                            }}
+                            className="block w-full text-xs"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1 tracking-tighter">
+                            Uploads to Supabase Storage bucket `knowledge-files`.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </section>
                   <section className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
@@ -756,6 +777,62 @@ const DeployManager: React.FC = () => {
                         Widget Launcher
                       </h3>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                        <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                          Launcher Surface
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {([
+                            { id: "solid", label: "Solid" },
+                            { id: "glass", label: "Glass" },
+                            { id: "liquid", label: "Liquid" },
+                          ] as const).map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setLauncherSurface(opt.id)}
+                              className={
+                                "h-9 rounded-xl px-3 text-[11px] font-bold transition-all tracking-tighter border " +
+                                (launcherSurface === opt.id
+                                  ? "bg-slate-900 text-white border-slate-900"
+                                  : "bg-white text-slate-700 border-slate-200 hover:border-slate-300")
+                              }
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                        <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
+                          Panel Surface
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {([
+                            { id: "solid", label: "Solid" },
+                            { id: "glass", label: "Glass" },
+                          ] as const).map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setPanelSurface(opt.id)}
+                              className={
+                                "h-9 rounded-xl px-3 text-[11px] font-bold transition-all tracking-tighter border " +
+                                (panelSurface === opt.id
+                                  ? "bg-slate-900 text-white border-slate-900"
+                                  : "bg-white text-slate-700 border-slate-200 hover:border-slate-300")
+                              }
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                         <label className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-tighter">
@@ -830,12 +907,12 @@ const DeployManager: React.FC = () => {
                 </div>
               )}
 
-                {activeTab === "embed" && (
-                  <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
-                    <section className="space-y-4">
-                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
-                        Embed Options
-                      </h3>
+              {activeTab === "embed" && (
+                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                  <section className="space-y-4">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tighter">
+                      Embed Options
+                    </h3>
 
                     <div className="bg-slate-900 rounded-3xl p-6 relative group border border-white/5">
                       <div className="flex justify-between items-center mb-4">
@@ -976,172 +1053,257 @@ const DeployManager: React.FC = () => {
           {/* The Actual Widget Wrapper */}
           <div className="relative w-full flex flex-col items-end">
             {/* Simulated Chat Interface */}
-            <div
-              className={`w-[380px] h-[580px] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200 z-10 mb-4 mr-4 transition-all duration-500 origin-bottom-right transform ${isWidgetOpen
-                ? "opacity-100 scale-100 translate-y-0"
-                : "opacity-0 scale-75 translate-y-12 pointer-events-none"
-                } ${theme === "dark" ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
-            >
-              {/* Header - Stagger 1 */}
-              <div
-                className={`p-6 flex justify-between items-center border-b transition-all duration-500 delay-100 ${isWidgetOpen
-                  ? "translate-y-0 opacity-100"
-                  : "-translate-y-4 opacity-0"
-                  } ${theme === "dark" ? "border-slate-800" : "border-slate-100"}`}
-                style={{ borderTop: `6px solid ${primaryColor}` }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-xl shadow-sm overflow-hidden">
-                    {avatarUrl && !previewAvatarFailed ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={String(avatarUrl)}
-                        alt={`${botName} avatar`}
-                        className="h-full w-full object-cover"
-                        onError={() => setPreviewAvatarFailed(true)}
-                      />
-                    ) : (
-                      "🤖"
-                    )}
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-sm tracking-tighter">
-                      {botName}
-                    </h5>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                      <span className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">
-                        Online
-                      </span>
+            {(() => {
+              const panelBody = (
+                <>
+                  {/* Header - Stagger 1 */}
+                  <div
+                    className={`p-6 flex justify-between items-center border-b transition-all duration-500 delay-100 ${isWidgetOpen
+                      ? "translate-y-0 opacity-100"
+                      : "-translate-y-4 opacity-0"
+                      } ${theme === "dark" ? "border-slate-800" : "border-slate-100"}`}
+                    style={{ borderTop: `6px solid ${primaryColor}` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-xl shadow-sm overflow-hidden">
+                        {avatarUrl && !previewAvatarFailed ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={String(avatarUrl)}
+                            alt={`${botName} avatar`}
+                            className="h-full w-full object-cover"
+                            onError={() => setPreviewAvatarFailed(true)}
+                          />
+                        ) : (
+                          "🤖"
+                        )}
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-sm tracking-tighter">{botName}</h5>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                          <span className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">
+                            Online
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsWidgetOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors p-2"
-                >
-                  <span className="text-xl">⌄</span>
-                </button>
-              </div>
-
-              {/* Message Area - Stagger 2 */}
-              <div className="flex-1 p-6 space-y-6 flex flex-col overflow-y-auto bg-transparent">
-                <div
-                  className={`flex gap-3 transition-all duration-500 delay-200 ${isWidgetOpen
-                    ? "translate-x-0 opacity-100"
-                    : "-translate-x-4 opacity-0"
-                    }`}
-                >
-                  <div className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center text-xs overflow-hidden">
-                    {avatarUrl && !previewAvatarFailed ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={String(avatarUrl)}
-                        alt={`${botName} avatar`}
-                        className="h-full w-full object-cover"
-                        onError={() => setPreviewAvatarFailed(true)}
-                      />
-                    ) : (
-                      "🤖"
-                    )}
-                  </div>
-                  <div
-                    className={`p-4 rounded-2xl rounded-tl-none text-sm leading-relaxed max-w-[85%] shadow-sm tracking-tighter ${theme === "dark" ? "bg-slate-800" : "bg-slate-100"}`}
-                  >
-                    {welcomeMessage}
-                  </div>
-                </div>
-
-                <div
-                  className={`flex justify-end mt-4 transition-all duration-500 delay-300 ${isWidgetOpen
-                    ? "translate-x-0 opacity-100"
-                    : "translate-x-4 opacity-0"
-                    }`}
-                >
-                  <div
-                    className="p-4 rounded-2xl rounded-tr-none text-sm font-medium shadow-lg transition-all duration-300 max-w-[80%] tracking-tighter"
-                    style={{ backgroundColor: primaryColor, color: launcherIconColor || "#ffffff" }}
-                  >
-                    Hey! I have a question about pricing.
-                  </div>
-                </div>
-
-                {/* Branding */}
-                <div
-                  className={`flex flex-col items-center gap-1 mt-auto pb-4 opacity-40 transition-all duration-700 delay-400 ${isWidgetOpen ? "scale-100 opacity-40" : "scale-90 opacity-0"
-                    }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="bg-slate-400 text-white text-[9px] font-black px-1 rounded tracking-tighter">
-                      CP
-                    </span>
-                    <span className="text-[10px] font-bold tracking-tighter">
-                      Powered by Chat Pilot
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Input Footer - Stagger 3 */}
-              <div
-                className={`p-6 border-t transition-all duration-500 delay-500 ${isWidgetOpen
-                  ? "translate-y-0 opacity-100"
-                  : "translate-y-4 opacity-0"
-                  } ${theme === "dark" ? "border-slate-800" : "border-slate-100"}`}
-              >
-                <div
-                  className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${theme === "dark" ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-white border-slate-200 focus-within:border-indigo-500"}`}
-                >
-                  <input
-                    placeholder="Ask a question..."
-                    className="bg-transparent text-sm w-full outline-none font-medium tracking-tighter"
-                    readOnly
-                  />
-                  <div className="flex gap-4 items-center">
-                    <span className="cursor-pointer opacity-50 hover:opacity-100 transition-opacity">
-                      📎
-                    </span>
                     <button
-                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-transform hover:scale-110"
-                      style={{ backgroundColor: primaryColor }}
+                      onClick={() => setIsWidgetOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 transition-colors p-2"
+                      type="button"
                     >
-                      <span className="text-xs">➔</span>
+                      <span className="text-xl">⌄</span>
                     </button>
                   </div>
+
+                  {/* Message Area - Stagger 2 */}
+                  <div className="flex-1 p-6 space-y-6 flex flex-col overflow-y-auto bg-transparent">
+                    <div
+                      className={`flex gap-3 transition-all duration-500 delay-200 ${isWidgetOpen
+                        ? "translate-x-0 opacity-100"
+                        : "-translate-x-4 opacity-0"
+                        }`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center text-xs overflow-hidden">
+                        {avatarUrl && !previewAvatarFailed ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={String(avatarUrl)}
+                            alt={`${botName} avatar`}
+                            className="h-full w-full object-cover"
+                            onError={() => setPreviewAvatarFailed(true)}
+                          />
+                        ) : (
+                          "🤖"
+                        )}
+                      </div>
+                      <div
+                        className={`p-4 rounded-2xl rounded-tl-none text-sm leading-relaxed max-w-[85%] shadow-sm tracking-tighter ${theme === "dark" ? "bg-slate-800" : "bg-slate-100"}`}
+                      >
+                        {welcomeMessage}
+                      </div>
+                    </div>
+
+                    <div
+                      className={`flex justify-end mt-4 transition-all duration-500 delay-300 ${isWidgetOpen
+                        ? "translate-x-0 opacity-100"
+                        : "translate-x-4 opacity-0"
+                        }`}
+                    >
+                      <div
+                        className="p-4 rounded-2xl rounded-tr-none text-sm font-medium shadow-lg transition-all duration-300 max-w-[80%] tracking-tighter"
+                        style={{
+                          backgroundColor: primaryColor,
+                          color: launcherIconColor || "#ffffff",
+                        }}
+                      >
+                        Hey! I have a question about pricing.
+                      </div>
+                    </div>
+
+                    {/* Branding */}
+                    <div
+                      className={`flex flex-col items-center gap-1 mt-auto pb-4 opacity-40 transition-all duration-700 delay-400 ${isWidgetOpen ? "scale-100 opacity-40" : "scale-90 opacity-0"
+                        }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-slate-400 text-white text-[9px] font-black px-1 rounded tracking-tighter">
+                          CP
+                        </span>
+                        <span className="text-[10px] font-bold tracking-tighter">
+                          Powered by Chat Pilot
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Input Footer - Stagger 3 */}
+                  <div
+                    className={`p-6 border-t transition-all duration-500 delay-500 ${isWidgetOpen
+                      ? "translate-y-0 opacity-100"
+                      : "translate-y-4 opacity-0"
+                      } ${theme === "dark" ? "border-slate-800" : "border-slate-100"}`}
+                  >
+                    <div
+                      className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${theme === "dark" ? "bg-slate-800 border-slate-700 focus-within:border-indigo-500" : "bg-white border-slate-200 focus-within:border-indigo-500"}`}
+                    >
+                      <input
+                        placeholder="Ask a question..."
+                        className="bg-transparent text-sm w-full outline-none font-medium tracking-tighter"
+                        readOnly
+                      />
+                      <div className="flex gap-4 items-center">
+                        <span className="cursor-pointer opacity-50 hover:opacity-100 transition-opacity">
+                          📎
+                        </span>
+                        <button
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-transform hover:scale-110"
+                          style={{ backgroundColor: primaryColor }}
+                          type="button"
+                        >
+                          <span className="text-xs">➔</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+
+              if (panelSurface === "glass") {
+                return (
+                  <GlassSurface
+                    width={380}
+                    height={580}
+                    borderRadius={40}
+                    backgroundOpacity={0.14}
+                    saturation={theme === "dark" ? 1.1 : 1.25}
+                    tint={theme === "dark" ? "0f172a" : "ffffff"}
+                    tintOpacity={theme === "dark" ? 0.5 : 0.55}
+                    className={`shadow-2xl flex flex-col overflow-hidden border z-10 mb-4 mr-4 transition-all duration-500 origin-bottom-right transform ${isWidgetOpen
+                      ? "opacity-100 scale-100 translate-y-0"
+                      : "opacity-0 scale-75 translate-y-12 pointer-events-none"
+                      } ${theme === "dark" ? "text-white border-white/10" : "text-slate-900 border-white/30"}`}
+                    contentClassName="block p-0 w-full h-full"
+                  >
+                    <div className="w-full h-full flex flex-col">{panelBody}</div>
+                  </GlassSurface>
+                );
+              }
+
+              return (
+                <div
+                  className={`w-[380px] h-[580px] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border z-10 mb-4 mr-4 transition-all duration-500 origin-bottom-right transform ${isWidgetOpen
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-75 translate-y-12 pointer-events-none"
+                    } ${theme === "dark" ? "bg-slate-900 text-white border-slate-200" : "bg-white text-slate-900 border-slate-200"}`}
+                >
+                  {panelBody}
                 </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Trigger Icon - Always Visible Floating Button */}
-            <button
-              onClick={() => setIsWidgetOpen(!isWidgetOpen)}
-              className="group w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
-              style={{
-                backgroundColor: launcherButtonColor || primaryColor,
-                color: launcherIconColor || "#ffffff",
-                boxShadow: `0 20px 50px ${(launcherButtonColor || primaryColor)}40`,
-              }}
-              aria-label={isWidgetOpen ? "Close chat" : "Open chat"}
-            >
-              {/* Icon Transition Logic */}
-              <div
-                className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-0 scale-50 rotate-90 translate-y-8" : "opacity-100 scale-100 rotate-0 translate-y-0"}`}
+            {launcherSurface === "glass" ? (
+              <GlassSurface
+                width={100}
+                height={100}
+                borderRadius={50}
+                className="my-custom-class"
               >
-                <span className="text-3xl">💬</span>
-              </div>
-              <div
-                className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-100 scale-100 rotate-0 translate-y-0" : "opacity-0 scale-50 -rotate-90 -translate-y-8"}`}
-              >
-                <span className="text-2xl font-bold">✕</span>
-              </div>
+                <button
+                  style={{
+                    backgroundColor: launcherButtonColor || primaryColor,
+                    color: launcherIconColor || "#ffffff",
+                    boxShadow: `0 20px 50px ${(launcherButtonColor || primaryColor)}40`,
+                  }}
+                  className="group w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
 
-              {/* Pulsing indicator when closed to attract attention */}
-              {!isWidgetOpen && (
-                <span className="absolute top-3 right-3 w-3 h-3 bg-red-500 border-2 border-white rounded-full flex items-center justify-center">
-                  <span className="w-full h-full bg-red-400 rounded-full animate-ping opacity-75"></span>
-                </span>
-              )}
-            </button>
+                  onClick={() => setIsWidgetOpen(!isWidgetOpen)}
+                >
+                  <div
+                    className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-0 scale-50 rotate-90 translate-y-8" : "opacity-100 scale-100 rotate-0 translate-y-0"}`}
+                  >
+                    <span className="text-3xl">💬</span>
+                  </div>
+                  <div
+                    className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-100 scale-100 rotate-0 translate-y-0" : "opacity-0 scale-50 -rotate-90 -translate-y-8"}`}
+                  >
+                    <span className="text-2xl font-bold">✕</span>
+                  </div>
+                  {!isWidgetOpen && (
+                    <span className="absolute top-3 right-3 w-3 h-3 bg-red-500 border-2 border-white rounded-full flex items-center justify-center">
+                      <span className="w-full h-full bg-red-400 rounded-full animate-ping opacity-75"></span>
+                    </span>
+                  )}
+                </button>
+              </GlassSurface>
+            ) : launcherSurface === "liquid" ? (
+              <LiquidMetalButton
+                viewMode="icon"
+                label={isWidgetOpen ? "✕" : "💬"}
+                variant="cta"
+                surfaceRadiusClassName="rounded-full"
+                active
+                tint={launcherButtonColor || primaryColor}
+                tintOpacity={0.18}
+                baseTintOpacity={0.16}
+                surfaceIdleOpacityClassName="opacity-40"
+                surfaceActiveOpacityClassName="opacity-55"
+                surfaceHoverOpacityClassName="opacity-75"
+                onClick={() => setIsWidgetOpen(!isWidgetOpen)}
+                className="group z-20 mr-4 mb-4 flex  items-center justify-center overflow-hidden bg-transparent transition-all duration-500 hover:scale-110 active:scale-95"
+              >
+              </LiquidMetalButton>
+            ) : (
+              <button
+                onClick={() => setIsWidgetOpen(!isWidgetOpen)}
+                className="group w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-2xl transition-all duration-500 hover:scale-110 active:scale-95 z-20 mr-4 mb-4 relative overflow-hidden"
+                style={{
+                  backgroundColor: launcherButtonColor || primaryColor,
+                  color: launcherIconColor || "#ffffff",
+                  boxShadow: `0 20px 50px ${(launcherButtonColor || primaryColor)}40`,
+                }}
+                aria-label={isWidgetOpen ? "Close chat" : "Open chat"}
+                type="button"
+              >
+                <div
+                  className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-0 scale-50 rotate-90 translate-y-8" : "opacity-100 scale-100 rotate-0 translate-y-0"}`}
+                >
+                  <span className="text-3xl">💬</span>
+                </div>
+                <div
+                  className={`absolute transition-all duration-500 ease-in-out ${isWidgetOpen ? "opacity-100 scale-100 rotate-0 translate-y-0" : "opacity-0 scale-50 -rotate-90 -translate-y-8"}`}
+                >
+                  <span className="text-2xl font-bold">✕</span>
+                </div>
+                {!isWidgetOpen && (
+                  <span className="absolute top-3 right-3 w-3 h-3 bg-red-500 border-2 border-white rounded-full flex items-center justify-center">
+                    <span className="w-full h-full bg-red-400 rounded-full animate-ping opacity-75"></span>
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

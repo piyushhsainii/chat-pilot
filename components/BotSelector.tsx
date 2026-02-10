@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { Bot, AlertCircle, CheckCircle2, Settings } from "lucide-react";
 import { BotWithRelations } from "@/lib/types";
+import { LiquidMetalButton } from "@/components/liquid-metal-button";
 
 // Circular Progress Component
 const CircularProgress: React.FC<{
@@ -15,6 +16,13 @@ const CircularProgress: React.FC<{
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (progress / 100) * circumference;
 
+    const ringClass =
+        progress === 100
+            ? "text-emerald-500/80"
+            : progress >= 50
+                ? "text-amber-500/75"
+                : "text-rose-500/60";
+
     return (
         <svg width={size} height={size} className={className}>
             {/* Background circle */}
@@ -25,10 +33,10 @@ const CircularProgress: React.FC<{
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={strokeWidth}
-                className="text-slate-200"
+                className="text-slate-200/80"
             />
             {/* Progress circle */}
-            <circle
+            <motion.circle
                 cx={size / 2}
                 cy={size / 2}
                 r={radius}
@@ -36,18 +44,17 @@ const CircularProgress: React.FC<{
                 stroke="currentColor"
                 strokeWidth={strokeWidth}
                 strokeDasharray={circumference}
-                strokeDashoffset={offset}
+                animate={{ strokeDashoffset: offset }}
+                initial={false}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                 strokeLinecap="round"
-                className={`transition-all duration-500 ${progress === 100
-                    ? "text-emerald-500"
-                    : progress >= 50
-                        ? "text-amber-400"
-                        : "text-red-400"
-                    }`}
-                style={{
-                    transform: "rotate(-90deg)",
-                    transformOrigin: "50% 50%",
-                }}
+                className={
+                    "-rotate-90 origin-center opacity-80 transition-opacity duration-300 group-hover:opacity-100 " +
+                    ringClass +
+                    (progress === 100
+                        ? " drop-shadow-[0_0_6px_rgba(16,185,129,0.18)]"
+                        : "")
+                }
             />
         </svg>
     );
@@ -64,131 +71,148 @@ const BotCard: React.FC<{
 }> = ({ bot, isSelected, isConfigured, progress, checks, onSelect }) => {
     const [showTooltip, setShowTooltip] = useState(false);
 
+    const nameClass =
+        "mt-2 max-w-[108px] truncate text-center text-xs font-medium tracking-tight transition-colors " +
+        (isSelected
+            ? "text-slate-900"
+            : isConfigured
+                ? "text-slate-800"
+                : "text-slate-500");
+
     return (
-        <div className="relative">
-            <motion.button
-                disabled={!isConfigured}
-                onClick={onSelect}
+        <div className="relative flex flex-col items-center">
+
+            <motion.div
+                whileHover={isConfigured ? { scale: 1.03 } : undefined}
+                whileTap={isConfigured ? { scale: 0.985 } : undefined}
+                transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.35 }}
                 onMouseEnter={() => setShowTooltip(true)}
                 onMouseLeave={() => setShowTooltip(false)}
-                whileHover={isConfigured ? { scale: 1.05 } : undefined}
-                whileTap={isConfigured ? { scale: 0.95 } : undefined}
-                className={`relative flex flex-col items-center gap-2 p-3 rounded-2xl transition-all ${!isConfigured
-                    ? "cursor-not-allowed opacity-60"
-                    : "cursor-pointer"
-                    }`}
             >
-                {/* Circular Progress with Icon */}
-                <div className="relative">
-                    <CircularProgress progress={progress} size={80} strokeWidth={6} />
-
-                    {/* Center Icon */}
-                    <div
-                        className={`absolute inset-0 flex items-center justify-center rounded-full transition-all ${isSelected
-                            ? "bg-indigo-500 shadow-lg shadow-indigo-200"
-                            : isConfigured
-                                ? "bg-slate-100 group-hover:bg-slate-200"
-                                : "bg-red-50"
-                            }`}
-                        style={{
-                            width: 68,
-                            height: 68,
-                            top: 6,
-                            left: 6,
-                        }}
-                    >
-                        {
-                            bot.avatar_url ?
-
-                                <img src={bot.avatar_url} alt="" className="rounded-full h-16 w-16 object-cover" /> :
-                                <Bot
-                                    className={`h-8 w-8 transition-colors ${isSelected
-                                        ? "text-white"
-                                        : isConfigured
-                                            ? "text-slate-600"
-                                            : "text-red-400"
-                                        }`}
-                                />
-                        }
-                    </div>
-
-                    {/* Active Indicator */}
+                <LiquidMetalButton
+                    variant="surface"
+                    disabled={!isConfigured}
+                    active={isSelected}
+                    onClick={onSelect}
+                    surfaceRadiusClassName="rounded-full"
+                    className={
+                        "group relative flex h-[92px] w-[92px] items-center justify-center bg-transparent" +
+                        (!isConfigured ? " opacity-70" : "")
+                    }
+                >
+                    {/* Selected halo */}
                     {isSelected && (
-                        <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-3 border-white shadow-lg flex items-center justify-center"
-                        >
-                            <div className="h-2 w-2 rounded-full bg-white" />
-                        </motion.div>
+                        <div className="pointer-events-none absolute inset-0 rounded-full bg-slate-900/5 blur-md" />
                     )}
+
+                    {/* Circular Progress with Icon */}
+                    <div className="relative">
+                        <CircularProgress progress={progress} size={80} strokeWidth={6} />
+
+                        {/* Center Icon */}
+                        <div
+                            className={
+                                "absolute left-[6px] top-[6px] flex h-[68px] w-[68px] items-center justify-center rounded-full border transition-colors " +
+                                (isSelected
+                                    ? "border-slate-900/5 bg-slate-900 text-white"
+                                    : isConfigured
+                                        ? "border-slate-200/70 bg-white group-hover:border-slate-300/70"
+                                        : "border-slate-200/70 bg-slate-50")
+                            }
+                        >
+                            {bot.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={bot.avatar_url}
+                                    alt=""
+                                    className="h-16 w-16 rounded-full object-cover"
+                                />
+                            ) : (
+                                <Bot
+                                    className={
+                                        "h-8 w-8 transition-colors " +
+                                        (isSelected
+                                            ? "text-white"
+                                            : isConfigured
+                                                ? "text-slate-700"
+                                                : "text-slate-400")
+                                    }
+                                />
+                            )}
+                        </div>
+
+                        {/* Active Indicator */}
+                        {isSelected && (
+                            <>
+                                <motion.div
+                                    initial={{ scale: 0.85, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ duration: 0.18, ease: "easeOut" }}
+                                    className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500/80 shadow-[0_6px_16px_rgba(16,185,129,0.18)]"
+                                >
+                                    <motion.div
+                                        className="h-2 w-2 rounded-full bg-white"
+                                        animate={{ opacity: [0.75, 1, 0.75] }}
+                                        transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+                                    />
+                                </motion.div>
+                                <motion.div
+                                    className="absolute -right-1 -top-1 h-6 w-6 rounded-full bg-emerald-500/30"
+                                    animate={{ scale: [1, 1.6, 1.6], opacity: [0.35, 0, 0] }}
+                                    transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+                                />
+                            </>
+                        )}
 
                     {/* Config Error Indicator */}
                     {!isConfigured && (
                         <Link
                             href={`/dashboard/agents`}
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-red-500 border-3 border-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors group/error"
+                            className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-rose-500/85 shadow-[0_6px_16px_rgba(244,63,94,0.18)] transition-colors hover:bg-rose-500"
                         >
                             <AlertCircle className="h-3.5 w-3.5 text-white" />
                         </Link>
                     )}
 
-                    {/* Progress Percentage */}
-                    <div
-                        className={`absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[10px] font-black ${progress === 100
-                            ? "bg-emerald-100 text-emerald-700"
-                            : progress >= 50
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-red-100 text-red-700"
-                            }`}
-                    >
-                        {progress}%
                     </div>
-                </div>
+                </LiquidMetalButton>
+            </motion.div>
 
-                {/* Bot Name */}
-                <div className="text-center w-full">
-                    <p
-                        className={`text-xs font-bold truncate max-w-[100px] transition-colors ${isSelected
-                            ? "text-indigo-600"
-                            : isConfigured
-                                ? "text-slate-800"
-                                : "text-slate-500"
-                            }`}
-                        title={bot.name}
-                    >
-                        {bot.name}
-                    </p>
-                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold uppercase mt-1 inline-block">
-                        {bot.tone}
-                    </span>
-                </div>
-            </motion.button>
+            {/* Bot Name */}
+            <p className={nameClass} title={bot.name}>
+                {bot.name}
+            </p>
 
             {/* Tooltip */}
-            {showTooltip && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 w-64 pointer-events-none"
-                >
-                    <div className="bg-white rounded-xl border-2 border-slate-200 shadow-xl p-4">
+            <AnimatePresence>
+                {showTooltip && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                        className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 pointer-events-none"
+                    >
+                        <div className="rounded-2xl border border-slate-200/70 bg-white/95 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-sm">
                         {/* Bot Info */}
                         <div className="flex items-center gap-2 mb-3">
                             <div
-                                className={`p-2 rounded-lg ${isConfigured ? "bg-emerald-50" : "bg-red-50"
-                                    }`}
+                                className={
+                                    "flex h-9 w-9 items-center justify-center rounded-xl border " +
+                                    (isConfigured
+                                        ? "border-emerald-200/60 bg-emerald-50/70"
+                                        : "border-rose-200/60 bg-rose-50/70")
+                                }
                             >
                                 {isConfigured ? (
-                                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600/80" />
                                 ) : (
-                                    <AlertCircle className="h-4 w-4 text-red-600" />
+                                    <AlertCircle className="h-4 w-4 text-rose-600/80" />
                                 )}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-slate-900 truncate">
+                                <p className="truncate text-sm font-medium text-slate-900">
                                     {bot.name}
                                 </p>
                                 <p className="text-xs text-slate-500">
@@ -197,69 +221,35 @@ const BotCard: React.FC<{
                             </div>
                         </div>
 
-                        {/* Configuration Status */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="font-semibold text-slate-600">Configuration</span>
-                                <span
-                                    className={`font-bold ${progress === 100
-                                        ? "text-emerald-600"
-                                        : progress >= 50
-                                            ? "text-amber-600"
-                                            : "text-red-600"
-                                        }`}
-                                >
-                                    {progress}% Complete
-                                </span>
-                            </div>
-
-                            {/* Progress Items */}
-                            <div className="space-y-1.5">
-                                {checks.map((check) => (
-                                    <div
-                                        key={check.label}
-                                        className="flex items-center gap-2 text-xs"
-                                    >
-                                        <div
-                                            className={`h-1.5 w-1.5 rounded-full ${check.valid ? "bg-emerald-500" : "bg-red-400"
-                                                }`}
-                                        />
-                                        <span
-                                            className={
-                                                check.valid ? "text-slate-600" : "text-red-600 font-medium"
-                                            }
-                                        >
-                                            {check.label}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Action Link */}
-                            {!isConfigured && (
-                                <Link
-                                    href={`/dashboard/bots/${bot.id}/config`}
-                                    className="mt-3 flex items-center gap-2 text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors pointer-events-auto"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <Settings className="h-3.5 w-3.5" />
-                                    <span>Fix Configuration →</span>
-                                </Link>
-                            )}
-                        </div>
+                        {/* Action Link */}
+                        {!isConfigured && (
+                            <Link
+                                href={`/dashboard/bots/${bot.id}/config`}
+                                className="pointer-events-auto mt-3 inline-flex items-center gap-2 text-xs font-medium text-slate-900 underline decoration-slate-300 underline-offset-4 transition-colors hover:decoration-slate-400"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Settings className="h-3.5 w-3.5 text-slate-700" />
+                                <span>Configure bot</span>
+                            </Link>
+                        )}
 
                         {/* Active Indicator in Tooltip */}
                         {isSelected && (
-                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
-                                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                <span className="text-xs font-semibold text-emerald-600">
+                            <div className="mt-3 flex items-center gap-2 border-t border-slate-100/70 pt-3">
+                                <motion.div
+                                    className="h-2 w-2 rounded-full bg-emerald-500/80"
+                                    animate={{ opacity: [0.55, 1, 0.55] }}
+                                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                                />
+                                <span className="text-xs font-medium text-emerald-700">
                                     Currently Active
                                 </span>
                             </div>
                         )}
                     </div>
-                </motion.div>
-            )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

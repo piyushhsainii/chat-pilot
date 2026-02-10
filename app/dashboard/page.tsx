@@ -64,6 +64,8 @@ const isBotFullyConfigured = (bot: any) => {
 const DashboardPage = () => {
   const { bots, workspaces } = useDashboardStore();
 
+  const SELECTED_BOT_STORAGE_KEY = "chatpilot.selectedBotId";
+
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const selectedBot = bots?.find((b) => b.id === selectedBotId);
 
@@ -99,11 +101,28 @@ const DashboardPage = () => {
   };
 
   useEffect(() => {
-    if (bots && bots.length > 0) {
-      const firstConfigured = bots.find((b) => isBotFullyConfigured(b));
-      setSelectedBotId((firstConfigured ?? bots[0]).id);
-    }
+    if (!bots || bots.length === 0) return;
+
+    const saved =
+      typeof window === "undefined"
+        ? null
+        : window.localStorage.getItem(SELECTED_BOT_STORAGE_KEY);
+    const savedValid = saved && bots.some((b) => String(b.id) === String(saved));
+
+    const firstConfigured = bots.find((b) => isBotFullyConfigured(b));
+    setSelectedBotId(
+      (savedValid ? String(saved) : null) ?? String((firstConfigured ?? bots[0]).id),
+    );
   }, [bots]);
+
+  useEffect(() => {
+    if (!selectedBotId) return;
+    try {
+      window.localStorage.setItem(SELECTED_BOT_STORAGE_KEY, selectedBotId);
+    } catch {
+      // ignore
+    }
+  }, [selectedBotId]);
 
   useEffect(() => {
     setCredits((prev) => ({ ...prev, total: getPlanCredits(workspaceTier) }));

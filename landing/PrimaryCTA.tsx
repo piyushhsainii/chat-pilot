@@ -36,8 +36,8 @@ export default function PrimaryCTA({
   }
 
   return (
-    // <Link href={href} className={className}>
-    <LiquidMetalButton label={textBuild} viewMode="text" />
-    // </Link>
+    <Link href={href} >
+      <LiquidMetalButton label={textBuild} viewMode="text" />
+    </Link>
   );
 }

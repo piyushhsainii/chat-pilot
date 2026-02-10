@@ -1,6 +1,5 @@
 (function () {
-  // Prevent the widget from recursively embedding itself inside the widget iframe.
-  // (This can happen if the host app includes widget.js globally.)
+  // Prevent recursive embedding
   try {
     const isFramed = window.self !== window.top;
     const url = new URL(window.location.href);
@@ -12,9 +11,6 @@
 
   if (window.ChatPilotWidget) return;
 
-  // Prevent recursive/nested widget injection.
-  // The widget renders the chat UI inside an iframe; if `widget.js` is ever
-  // included on the iframe page (or any embedded context), we must no-op.
   const __cp_isEmbeddedContext = (() => {
     try {
       if (window.self !== window.top) return true;
@@ -36,8 +32,6 @@
 
   if (__cp_isEmbeddedContext) return;
 
-  // Capture the exact <script> element that loaded widget.js.
-  // This is the most reliable way to read data-* attributes like data-bot-id.
   const __cp_loaderScript = (() => {
     try {
       const s = document.currentScript;
@@ -48,11 +42,16 @@
     return null;
   })();
 
+  const PAPER_SHADERS_CDN_URL =
+    "https://cdn.jsdelivr.net/npm/@paper-design/shaders@0.0.71/dist/index.js";
+
   class ChatPilotWidget {
     constructor() {
       this.hasRemoteConfig = false;
       this.loaderScript = __cp_loaderScript;
       this.config = this.extractConfig();
+      this.shaderMount = null;
+      this.iconShaderMounts = [];
 
       console.log("[ChatPilot] Config extracted:", this.config);
 
@@ -66,18 +65,31 @@
     }
 
     extractConfig() {
-      const DEFAULT_BASE_URL = "http://localhost:3000";
-      // const DEFAULT_BASE_URL = "https://www.chatpilot-agent.com";
+      const DEFAULT_BASE_URL = (() => {
+        try {
+          const origin = window.location?.origin;
+          if (origin && origin !== "null") return origin;
+        } catch {
+          // ignore
+        }
+        return "https://www.chatpilot-agent.com";
+      })();
 
-      // Preferred: config injected via /api/widget/chat
+      const normalizeSurface = (v, fallback) => {
+        const raw = String(v || "")
+          .trim()
+          .toLowerCase();
+        if (!raw) return fallback;
+        if (raw === "solid" || raw === "glass" || raw === "liquid") return raw;
+        return fallback;
+      };
+
       if (window.__CHAT_WIDGET__ && window.__CHAT_WIDGET__.botId) {
         const cfg = window.__CHAT_WIDGET__;
         const widgetScript = document.querySelector("script[src*='widget.js']");
         const inferredBaseUrl = (() => {
           if (!widgetScript?.src) return DEFAULT_BASE_URL;
           const u = new URL(widgetScript.src, window.location.href);
-          // If the script is served from the host site (relative path),
-          // do NOT treat that as the API origin.
           if (u.origin === window.location.origin) return DEFAULT_BASE_URL;
           return u.origin;
         })();
@@ -90,16 +102,17 @@
             cfg.buttonColor || cfg.button_color || cfg.button || null,
           textColor: cfg.textColor || cfg.text || cfg.text_color || null,
           name: cfg.name || "Chat Assistant",
+          launcherSurface: normalizeSurface(
+            cfg.launcherSurface || cfg.launcher_surface,
+            "glass",
+          ),
+          panelSurface: normalizeSurface(
+            cfg.panelSurface || cfg.panel_surface,
+            "solid",
+          ),
         };
       }
 
-      // Log all script tags for debugging
-      const allScripts = document.querySelectorAll("script");
-      console.log("[ChatPilot] Total scripts found:", allScripts.length);
-
-      // 1) Best: the script tag that loaded widget.js (document.currentScript).
-      // 2) Next: a script tag with BOTH data-bot-id and a widget.js src.
-      // 3) Fallback: any script tag with data-bot-id.
       const script = (() => {
         try {
           const loader = this.loaderScript;
@@ -118,19 +131,11 @@
           return null;
         }
       })();
-      console.log("[ChatPilot] Script with data-bot-id:", script);
 
       if (!script) {
-        console.warn("[ChatPilot] Script tag with data-bot-id not found");
-
-        // Fallback: try to find by src
         const widgetScript = document.querySelector("script[src*='widget.js']");
-        console.log("[ChatPilot] Widget script by src:", widgetScript);
-
         if (widgetScript) {
           const botId = widgetScript.getAttribute("data-bot-id");
-          console.log("[ChatPilot] BotId from widget script:", botId);
-
           if (botId) {
             return {
               botId,
@@ -151,18 +156,14 @@
       }
 
       const botId = script.getAttribute("data-bot-id");
-      console.log("[ChatPilot] Extracted botId:", botId);
 
       if (!botId) {
-        console.warn("[ChatPilot] data-bot-id is missing");
         return null;
       }
 
       const baseUrlFromSrc = (() => {
         if (!script?.src) return null;
         const u = new URL(script.src, window.location.href);
-        // If widget.js is loaded from host site (relative path),
-        // don't assume API is also hosted there.
         if (u.origin === window.location.origin) return null;
         return u.origin;
       })();
@@ -180,14 +181,22 @@
         name: decodeURIComponent(
           script.getAttribute("data-name") || "Chat Assistant",
         ),
+        launcherSurface: normalizeSurface(
+          script.getAttribute("data-launcher-surface"),
+          "glass",
+        ),
+        panelSurface: normalizeSurface(
+          script.getAttribute("data-panel-surface"),
+          "solid",
+        ),
       };
     }
 
     init() {
       const host = document.createElement("div");
       host.style.position = "fixed";
-      host.style.bottom = "20px";
-      host.style.right = "20px";
+      host.style.bottom = "16px";
+      host.style.right = "16px";
       host.style.zIndex = "2147483647";
 
       const shadow = host.attachShadow({ mode: "open" });
@@ -198,15 +207,91 @@
       this.shadow = shadow;
       this.wrapper = shadow.querySelector(".wrapper");
       this.trigger = shadow.querySelector(".trigger");
+      this.panel = shadow.querySelector(".panel");
       this.iframe = shadow.querySelector("iframe");
 
+      this.shaderHost = null;
+      this.iconLiquidHosts = [];
+
       this.bindEvents();
-
-      // Apply initial (inline) config immediately
       this.applyConfigToUI();
-
-      // Load latest widget config from server (colors, title, theme)
       this.loadRemoteConfig();
+    }
+
+    async mountLiquidMetal() {
+      const isLiquid = this.config?.launcherSurface === "liquid";
+      if (!isLiquid) return;
+
+      try {
+        // Create shader container with exact same styling as working example
+        if (!this.shaderHost) {
+          const container = document.createElement("div");
+          container.className = "shader-container-exploded";
+          Object.assign(container.style, {
+            position: "absolute",
+            inset: "0",
+            width: "var(--cp-trigger-size)",
+            height: "var(--cp-trigger-size)",
+            borderRadius: "100px",
+            pointerEvents: "none",
+            zIndex: "1",
+          });
+
+          // Append to trigger button
+          this.trigger.appendChild(container);
+          this.shaderHost = container;
+
+          // Create inner black circle (like in working script.js)
+          const inner = document.createElement("div");
+          Object.assign(inner.style, {
+            position: "absolute",
+            top: "2px",
+            left: "2px",
+            width: "calc(var(--cp-trigger-size) - 4px)",
+            height: "calc(var(--cp-trigger-size) - 4px)",
+            borderRadius: "100px",
+            background: "linear-gradient(180deg, #202020 0%, #000 100%)",
+            zIndex: "2",
+            pointerEvents: "none",
+          });
+
+          this.trigger.appendChild(inner);
+        }
+
+        const { liquidMetalFragmentShader, ShaderMount } = await import(
+          /* webpackIgnore: true */ PAPER_SHADERS_CDN_URL
+        );
+
+        // Clean up old mount
+        if (this.shaderMount?.destroy) {
+          this.shaderMount.destroy();
+          this.shaderMount = null;
+        }
+
+        // Create shader mount exactly like working example
+        this.shaderMount = new ShaderMount(
+          this.shaderHost,
+          liquidMetalFragmentShader,
+          {
+            u_repetition: 4,
+            u_softness: 0.5,
+            u_shiftRed: 0.3,
+            u_shiftBlue: 0.3,
+            u_angle: 0,
+            u_scale: 8,
+            u_shape: 1,
+            u_offsetX: 0.0,
+            u_offsetY: 0.0,
+          },
+          undefined,
+          0.6,
+        );
+
+        console.log("[ChatPilot] Liquid metal shader mounted successfully");
+        this.applyShaderColors();
+      } catch (error) {
+        console.error("[ChatPilot] Failed to mount liquid metal:", error);
+      }
     }
 
     requestConfigFromIframe() {
@@ -216,9 +301,7 @@
           { type: "chatpilot:config:request" },
           "*",
         );
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
 
     async loadRemoteConfigViaFetch() {
@@ -243,11 +326,15 @@
         const primary = data?.widget?.primary_color;
         const buttonColor = data?.widget?.button_color;
         const textColor = data?.widget?.text_color;
+        const launcherSurface = data?.widget?.launcher_surface;
+        const panelSurface = data?.widget?.panel_surface;
 
         if (title) this.config.name = title;
         if (primary) this.config.primary = primary;
         if (buttonColor) this.config.buttonColor = buttonColor;
         if (textColor) this.config.textColor = textColor;
+        if (launcherSurface) this.config.launcherSurface = launcherSurface;
+        if (panelSurface) this.config.panelSurface = panelSurface;
 
         this.applyConfigToUI();
         this.hasRemoteConfig = true;
@@ -258,25 +345,19 @@
     }
 
     loadRemoteConfig() {
-      // 1) Best: ask the iframe (no extra network, CSP-friendly)
       if (this.iframe) {
         this.iframe.addEventListener("load", () => {
           this.requestConfigFromIframe();
-
-          // If the iframe didn't respond, try again shortly.
           setTimeout(() => {
             if (!this.hasRemoteConfig) this.requestConfigFromIframe();
           }, 750);
         });
       }
 
-      // Kick an initial request in case iframe is already loaded.
       setTimeout(() => this.requestConfigFromIframe(), 50);
 
-      // 2) Fallback: CORS fetch (works on many sites; blocked by some CSPs)
       this.loadRemoteConfigViaFetch().then((ok) => {
         if (ok) return;
-        // 3) Last resort: JSONP script injection
         this.loadRemoteConfigViaScript();
       });
     }
@@ -287,9 +368,7 @@
       window[cb] = (data) => {
         try {
           delete window[cb];
-        } catch {
-          // ignore
-        }
+        } catch {}
 
         if (!data) return;
 
@@ -297,11 +376,15 @@
         const primary = data?.widget?.primary_color;
         const buttonColor = data?.widget?.button_color;
         const textColor = data?.widget?.text_color;
+        const launcherSurface = data?.widget?.launcher_surface;
+        const panelSurface = data?.widget?.panel_surface;
 
         if (title) this.config.name = title;
         if (primary) this.config.primary = primary;
         if (buttonColor) this.config.buttonColor = buttonColor;
         if (textColor) this.config.textColor = textColor;
+        if (launcherSurface) this.config.launcherSurface = launcherSurface;
+        if (panelSurface) this.config.panelSurface = panelSurface;
 
         this.applyConfigToUI();
       };
@@ -315,9 +398,7 @@
       s.onerror = () => {
         try {
           delete window[cb];
-        } catch {
-          // ignore
-        }
+        } catch {}
       };
 
       document.head.appendChild(s);
@@ -326,11 +407,28 @@
     applyConfigToUI() {
       const DEFAULT_PRIMARY = "#6366f1";
 
+      const normalizeSurface = (v, fallback) => {
+        const raw = String(v || "")
+          .trim()
+          .toLowerCase();
+        if (!raw) return fallback;
+        if (raw === "solid" || raw === "glass" || raw === "liquid") return raw;
+        return fallback;
+      };
+
+      this.config.launcherSurface = normalizeSurface(
+        this.config?.launcherSurface,
+        "glass",
+      );
+      this.config.panelSurface = normalizeSurface(
+        this.config?.panelSurface,
+        "solid",
+      );
+
       const normalizeHex = (hex, fallback) => {
         if (!hex) return fallback;
         const v = String(hex).trim();
         if (!v) return fallback;
-        // If someone accidentally saved "##xxxxxx", normalize it.
         const cleaned = v.replace(/^#+/, "#");
         return cleaned.startsWith("#") ? cleaned : `#${cleaned}`;
       };
@@ -356,12 +454,11 @@
       };
 
       const rgb = hexToRgb(primary);
-      const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`;
-      const shadowColorHover = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+      const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`;
+      const shadowColorHover = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`;
 
       const derivedTextColor = (() => {
         if (textColor) return textColor;
-        // YIQ contrast against the button bg
         const yiq = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
         return yiq >= 170 ? "#111827" : "#ffffff";
       })();
@@ -373,21 +470,143 @@
         this.wrapper.style.setProperty("--cp-shadow-hover", shadowColorHover);
       }
 
-      // Hard override the trigger itself to ensure styles apply
-      // even if CSS variables are blocked/ignored by the host.
       if (this.trigger) {
-        this.trigger.style.background = primary;
         this.trigger.style.color = derivedTextColor;
+        const supportsBackdrop = (() => {
+          try {
+            return (
+              (typeof CSS !== "undefined" &&
+                CSS.supports &&
+                (CSS.supports("backdrop-filter: blur(10px)") ||
+                  CSS.supports("-webkit-backdrop-filter: blur(10px)"))) ||
+              false
+            );
+          } catch {
+            return false;
+          }
+        })();
+
+        const launcherSurface = this.config?.launcherSurface || "glass";
+        if (launcherSurface === "solid") {
+          this.trigger.style.background = primary;
+        } else if (launcherSurface === "liquid") {
+          this.trigger.style.background = "transparent";
+        } else {
+          this.trigger.style.background = supportsBackdrop ? "" : primary;
+        }
+        this.trigger.style.boxShadow = `0 20px 50px ${shadowColor}`;
+        this.trigger.style.setProperty("--cp-primary", primary);
+        this.trigger.style.setProperty("--cp-text", derivedTextColor);
+        this.trigger.style.setProperty("--cp-shadow", shadowColor);
+        this.trigger.style.setProperty("--cp-shadow-hover", shadowColorHover);
       }
 
       if (this.iframe) this.iframe.title = this.config.name;
+
+      if (this.wrapper) {
+        const launcherSurface = this.config?.launcherSurface || "glass";
+        const panelSurface = this.config?.panelSurface || "solid";
+        this.wrapper.setAttribute("data-launcher-surface", launcherSurface);
+        this.wrapper.setAttribute("data-panel-surface", panelSurface);
+        this.wrapper.setAttribute("data-theme", this.config?.theme || "light");
+      }
+
+      // Mount liquid metal if needed
+      if (this.config?.launcherSurface === "liquid") {
+        this.mountLiquidMetal();
+      }
+
+      this.applyShaderColors();
+    }
+
+    applyShaderColors() {
+      if (!this.shaderMount) return;
+
+      try {
+        const normalizeHex = (hex, fallback) => {
+          if (!hex) return fallback;
+          const v = String(hex).trim();
+          if (!v) return fallback;
+          const cleaned = v.replace(/^#+/, "#");
+          return cleaned.startsWith("#") ? cleaned : `#${cleaned}`;
+        };
+
+        const primary = normalizeHex(
+          this.config?.buttonColor || this.config?.primary,
+          "",
+        );
+
+        if (!primary) return;
+
+        const hexToRgb = (hex) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result
+            ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+              }
+            : null;
+        };
+
+        const rgb = hexToRgb(primary);
+        if (!rgb) return;
+
+        const setUniforms =
+          this.shaderMount?.setUniformValues || this.shaderMount?.setUniforms;
+        if (setUniforms) {
+          setUniforms.call(this.shaderMount, {
+            u_colorBack: [0, 0, 0, 0],
+            u_colorTint: [rgb.r / 255, rgb.g / 255, rgb.b / 255, 0.3],
+          });
+        }
+      } catch {}
     }
 
     bindEvents() {
-      this.trigger.addEventListener("click", () => this.toggle());
+      if (this.trigger) {
+        const isLiquid = () =>
+          (this.config?.launcherSurface || "glass") === "liquid";
+
+        const setSpeed = (v) => {
+          if (!isLiquid()) return;
+          try {
+            this.shaderMount?.setSpeed?.(v);
+          } catch {}
+        };
+
+        this.trigger.addEventListener("mouseenter", async () => {
+          if (!isLiquid()) return;
+          if (!this.shaderMount) {
+            await this.mountLiquidMetal();
+          }
+          setSpeed(1);
+        });
+
+        this.trigger.addEventListener("mouseleave", () => {
+          setSpeed(0.6);
+        });
+
+        this.trigger.addEventListener("click", () => {
+          if (isLiquid()) {
+            setSpeed(2.4);
+            setTimeout(() => {
+              try {
+                const hovered = this.trigger?.matches?.(":hover");
+                setSpeed(hovered ? 1 : 0.6);
+              } catch {}
+            }, 300);
+          }
+
+          this.toggle();
+        });
+      }
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && this.isOpen) this.close();
+      });
 
       window.addEventListener("message", (e) => {
-        // Only accept messages from our iframe, regardless of the host page origin.
         if (e.source !== this.iframe?.contentWindow) return;
         if (e.data?.type === "chatpilot:close") this.close();
 
@@ -398,6 +617,13 @@
           if (cfg.button_color) this.config.buttonColor = cfg.button_color;
           if (cfg.text_color || cfg.textColor) {
             this.config.textColor = cfg.text_color || cfg.textColor;
+          }
+          if (cfg.launcher_surface || cfg.launcherSurface) {
+            this.config.launcherSurface =
+              cfg.launcher_surface || cfg.launcherSurface;
+          }
+          if (cfg.panel_surface || cfg.panelSurface) {
+            this.config.panelSurface = cfg.panel_surface || cfg.panelSurface;
           }
           this.hasRemoteConfig = true;
           this.applyConfigToUI();
@@ -412,29 +638,33 @@
     open() {
       this.isOpen = true;
       this.wrapper.classList.add("open");
-      this.trigger.innerHTML = this.getCloseIcon();
+      if (this.trigger) {
+        this.trigger.setAttribute("aria-label", "Close chat");
+        this.trigger.setAttribute("aria-expanded", "true");
+
+        // Update icon to X/close icon
+        const icon = this.trigger.querySelector(".triggerIcon");
+        if (icon) {
+          icon.innerHTML =
+            '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
+        }
+      }
     }
 
     close() {
       this.isOpen = false;
       this.wrapper.classList.remove("open");
-      this.trigger.innerHTML = this.getChatIcon();
-    }
+      if (this.trigger) {
+        this.trigger.setAttribute("aria-label", "Open chat");
+        this.trigger.setAttribute("aria-expanded", "false");
 
-    getChatIcon() {
-      return `
-        <svg class="triggerIcon triggerIcon--chat" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="var(--cp-text)" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2zm4 6a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H8zm0-4a1 1 0 1 0 0 2h10a1 1 0 1 0 0-2H8z" />
-        </svg>
-      `;
-    }
-
-    getCloseIcon() {
-      return `
-        <svg class="triggerIcon triggerIcon--close" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="var(--cp-text)" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 1 0 5.7 7.11L10.59 12l-4.9 4.89a1 1 0 1 0 1.42 1.42L12 13.41l4.89 4.9a1 1 0 0 0 1.42-1.42L13.41 12l4.9-4.89a1 1 0 0 0-.01-1.4z" />
-        </svg>
-      `;
+        // Update icon back to chat bubble
+        const icon = this.trigger.querySelector(".triggerIcon");
+        if (icon) {
+          icon.innerHTML =
+            '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>';
+        }
+      }
     }
 
     getTemplate() {
@@ -457,7 +687,6 @@
       );
       const textColor = normalizeHex(this.config.textColor, "");
 
-      // Convert hex to RGB for shadow
       const hexToRgb = (hex) => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result
@@ -466,12 +695,12 @@
               g: parseInt(result[2], 16),
               b: parseInt(result[3], 16),
             }
-          : { r: 99, g: 102, b: 241 }; // fallback to default indigo
+          : { r: 99, g: 102, b: 241 };
       };
 
       const rgb = hexToRgb(primary);
-      const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`;
-      const shadowColorHover = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+      const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`;
+      const shadowColorHover = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`;
 
       const derivedTextColor = (() => {
         if (textColor) return textColor;
@@ -487,6 +716,16 @@
     padding: 0;
   }
 
+  /* Shader canvas styles - critical for WebGL */
+  .shader-container-exploded canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 100px !important;
+  }
+
   .wrapper {
     position: relative;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -496,149 +735,183 @@
     --cp-text: ${derivedTextColor};
     --cp-shadow: ${shadowColor};
     --cp-shadow-hover: ${shadowColorHover};
+    --cp-trigger-size: 64px;
+    --cp-gap: 16px;
   }
 
-  iframe {
+  .panel {
     width: 380px;
-    height: 600px;
-    border: none;
-    border-radius: 18px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    height: 580px;
     position: absolute;
-    bottom: 80px;
     right: 0;
+    bottom: calc(var(--cp-trigger-size) + var(--cp-gap));
     opacity: 0;
-    transform: scale(0.9) translateY(10px);
     pointer-events: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    background: white;
+    transform-origin: bottom right;
+    transform: scale(0.75) translateY(48px);
+    transition: opacity 500ms cubic-bezier(0.4, 0, 0.2, 1),
+      transform 500ms cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 40px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    background: #ffffff;
+    overflow: hidden;
   }
 
-  .wrapper.open iframe {
+  @supports ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
+    .wrapper[data-panel-surface="glass"] .panel {
+      background: rgba(255, 255, 255, 0.72);
+      border-color: rgba(255, 255, 255, 0.32);
+      backdrop-filter: blur(18px) saturate(1.2);
+      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    }
+
+    .wrapper[data-theme="dark"][data-panel-surface="glass"] .panel {
+      background: rgba(15, 23, 42, 0.68);
+      border-color: rgba(148, 163, 184, 0.18);
+    }
+  }
+
+  .wrapper.open .panel {
     opacity: 1;
     transform: scale(1) translateY(0);
     pointer-events: all;
   }
 
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
   .trigger {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: var(--cp-primary);
-    color: var(--cp-text);
+    width: var(--cp-trigger-size);
+    height: var(--cp-trigger-size);
+    border-radius: 9999px;
     border: none;
     cursor: pointer;
-    font-size: 26px;
-    box-shadow: 0 10px 25px var(--cp-shadow);
+    outline: none;
+    background: var(--cp-primary);
+    color: var(--cp-text);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 36px 14px 0 rgba(0, 0, 0, 0.02), 0 20px 12px 0 rgba(0, 0, 0, 0.08), 0 9px 9px 0 rgba(0, 0, 0, 0.12), 0 2px 5px 0 rgba(0, 0, 0, 0.15);
+    transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Rounded', 'Segoe UI', Roboto, system-ui, sans-serif;
-    font-weight: 500;
-    letter-spacing: -0.02em;
+    overflow: hidden;
+  }
+
+  @supports ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
+    .wrapper[data-launcher-surface="glass"] .trigger {
+      background: rgba(var(--cp-primary-rgb), 0.18);
+      backdrop-filter: blur(14px) saturate(1.4);
+      -webkit-backdrop-filter: blur(14px) saturate(1.4);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+  }
+
+  .wrapper[data-launcher-surface="liquid"] .trigger {
+    background: transparent;
+  }
+
+  .trigger:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 12px 6px 0 rgba(0, 0, 0, 0.05), 0 8px 5px 0 rgba(0, 0, 0, 0.1), 0 4px 4px 0 rgba(0, 0, 0, 0.15), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .trigger:active {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  .wrapper[data-launcher-surface="liquid"] .trigger:hover {
+    transform: none;
+  }
+
+  .wrapper[data-launcher-surface="liquid"] .trigger:active {
+    transform: translateY(1px);
   }
 
   .triggerIcon {
     width: 28px;
     height: 28px;
     display: block;
-    color: var(--cp-text);
+    color: currentColor;
     user-select: none;
+    position: relative;
+    z-index: 10;
+    transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease;
   }
 
-  .triggerIcon--chat {
-    width: 30px;
-    height: 30px;
+  .wrapper.open .triggerIcon {
+    transform: rotate(90deg);
   }
 
-  .triggerIcon--close {
-    width: 26px;
-    height: 26px;
-  }
-
-  .trigger:hover {
-    transform: scale(1.1);
-    box-shadow: 0 15px 35px var(--cp-shadow-hover);
-  }
-
-  .trigger:active {
-    transform: scale(0.95);
-  }
-
-  /* Notification badge when closed */
-  .trigger::after {
-    content: '';
+  .indicator {
     position: absolute;
     top: 8px;
     right: 8px;
     width: 12px;
     height: 12px;
+    border-radius: 9999px;
     background: #ef4444;
-    border: 2px solid white;
-    border-radius: 50%;
-    opacity: 1;
-    transition: opacity 0.3s;
+    border: 2px solid #ffffff;
+    z-index: 50;
   }
 
-  .wrapper.open .trigger::after {
-    opacity: 0;
+  .indicatorPing {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: #f87171;
+    animation: ping 1.25s cubic-bezier(0, 0, 0.2, 1) infinite;
+    opacity: 0.75;
   }
 
-  /* Pulsing animation for notification */
-  @keyframes pulse-ring {
+  .wrapper.open .indicator {
+    display: none;
+  }
+
+  @keyframes ping {
     0% {
       transform: scale(1);
-      opacity: 1;
+      opacity: 0.75;
     }
     100% {
-      transform: scale(1.5);
+      transform: scale(2);
       opacity: 0;
     }
   }
 
-  .trigger::before {
-    content: '';
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 12px;
-    height: 12px;
-    background: #ef4444;
-    border-radius: 50%;
-    animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    opacity: 0.75;
-  }
-
-  .wrapper.open .trigger::before {
-    display: none;
-  }
-
-  /* Responsive adjustments */
   @media (max-width: 480px) {
-    iframe {
-      width: calc(100vw - 40px);
-      height: calc(100vh - 100px);
-      right: -10px;
-      bottom: 75px;
+    .panel {
+      width: calc(100vw - 32px);
+      height: calc(100vh - 120px);
+      border-radius: 32px;
     }
   }
 </style>
 
-<div class="wrapper">
-  <iframe
-    src="${this.config.baseUrl}/api/widget/chat?${params.toString()}"
-    title="${this.config.name}"
-    allow="clipboard-write"
-    loading="eager"
-  ></iframe>
+<div class="wrapper" data-launcher-surface="${this.config.launcherSurface || "glass"}" data-panel-surface="${this.config.panelSurface || "solid"}" data-theme="${this.config.theme || "light"}">
+  <div class="panel">
+    <iframe
+      src="${this.config.baseUrl}/api/widget/chat?${params.toString()}"
+      title="${this.config.name}"
+      allow="clipboard-write"
+      loading="eager"
+    ></iframe>
+  </div>
 
-  <button class="trigger" aria-label="Open chat">
-    ${this.getChatIcon()}
+  <button class="trigger" aria-label="Open chat" aria-expanded="false">
+    <svg class="triggerIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
   </button>
 </div>
-`;
+      `;
     }
   }
 

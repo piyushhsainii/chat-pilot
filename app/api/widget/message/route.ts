@@ -10,33 +10,15 @@ import {
 } from "@/lib/billing/credits";
 import { insertChatLog } from "@/lib/analytics/chatLogs";
 import { buildBotTools } from "@/lib/tools/buildBotTools";
+import {
+  hasLocalhostInAllowedDomains,
+  hostnameFromUrlLike,
+  isHostnameAllowed,
+  isLocalhostHostname,
+} from "@/lib/bot/allowedDomains";
 
 function parseTestMode(v: unknown) {
   return v === true || v === "true" || v === 1 || v === "1";
-}
-
-function hostnameFromUrlLike(value?: string | null): string | null {
-  if (!value) return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-  try {
-    return new URL(raw).hostname.toLowerCase();
-  } catch {
-    try {
-      return new URL(`http://${raw}`).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-}
-
-function isAllowedHostname(hostname: string, allowed: string[]) {
-  const h = hostname.toLowerCase();
-  return allowed.some((raw) => {
-    const a = hostnameFromUrlLike(raw);
-    if (!a) return false;
-    return h === a || h.endsWith(`.${a}`);
-  });
 }
 
 type WidgetMessageBody = {
@@ -198,11 +180,15 @@ export async function POST(req: NextRequest) {
     const reqHostname = hostnameFromUrlLike(
       req.headers.get("origin") || req.headers.get("referer"),
     );
+    const allowLocalhost = hasLocalhostInAllowedDomains(allowedDomains);
+    const isLocalDevServer = allowLocalhost && isLocalhostHostname(serverHostname);
     const ok =
-      !!reqHostname &&
-      (reqHostname === serverHostname ||
-        reqHostname.endsWith(`.${serverHostname}`) ||
-        isAllowedHostname(reqHostname, allowedDomains));
+      (!!reqHostname &&
+        (reqHostname === serverHostname ||
+          reqHostname.endsWith(`.${serverHostname}`) ||
+          (allowLocalhost && isLocalhostHostname(reqHostname)) ||
+          isHostnameAllowed(reqHostname, allowedDomains))) ||
+      (!reqHostname && isLocalDevServer);
     if (!ok) {
       return NextResponse.json({ error: "Unauthorized origin" }, { status: 403 });
     }
@@ -334,7 +320,7 @@ export async function POST(req: NextRequest) {
     .from("knowledge_sources" as any)
     .select("name, type, status, doc_url")
     .eq("bot_id", resolvedBotId)
-    .neq("status", "failed")
+    .or("status.is.null,status.neq.failed")
     .order("created_at", { ascending: false });
 
   const { contextText } = await buildKnowledgeContextForQuery(admin as any, {

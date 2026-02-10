@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
   const bot = await validateBot(
     botId,
     req.headers.get("origin") || req.headers.get("referer"),
+    req.nextUrl.hostname,
   );
   if (!bot) {
     const body = `try { window[${JSON.stringify(callback)}](null); } catch (e) {}`;
@@ -48,6 +49,8 @@ export async function GET(req: NextRequest) {
       button_color: bot.widgets?.button_color ?? null,
       text_color: bot.widgets?.text_color ?? null,
       greeting_message: bot.widgets?.greeting_message ?? null,
+      launcher_surface: (bot.widgets as any)?.launcher_surface ?? null,
+      panel_surface: (bot.widgets as any)?.panel_surface ?? null,
     },
   };
 

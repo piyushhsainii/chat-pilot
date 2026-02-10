@@ -27,8 +27,29 @@ async function fetchToText(type: Payload["type"], publicUrl: string) {
 
   const buf = Buffer.from(await res.arrayBuffer());
   const mod = (await import("pdf-parse")) as any;
-  const pdfParse = (mod?.default ?? mod) as any;
-  const parsed = await pdfParse(buf);
+
+  // pdf-parse@2.x exports a PDFParse class (call with `new`), older builds may
+  // export a callable function. Support both.
+  const PDFParseCtor =
+    (typeof mod?.PDFParse === "function" ? mod.PDFParse : null) ||
+    (typeof mod?.default?.PDFParse === "function" ? mod.default.PDFParse : null);
+
+  if (PDFParseCtor) {
+    const parser = new PDFParseCtor({ data: buf });
+    try {
+      const parsed = await parser.getText();
+      return String(parsed?.text ?? "");
+    } finally {
+      await parser.destroy?.().catch(() => {});
+    }
+  }
+
+  const pdfParseFn =
+    (typeof mod === "function" ? mod : null) ||
+    (typeof mod?.default === "function" ? mod.default : null);
+
+  if (!pdfParseFn) throw new Error("pdf-parse export not supported");
+  const parsed = await pdfParseFn(buf);
   return String(parsed?.text ?? "");
 }
 

@@ -7,7 +7,7 @@ interface NavbarProps {
   scrolled: boolean;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
+const Navbar: React.FC = () => {
   return (
     <div className="fixed top-6 left-0 w-full z-50 flex justify-center pointer-events-none ">
       <GlassSurface
@@ -17,7 +17,6 @@ const Navbar: React.FC<NavbarProps> = ({ scrolled }) => {
            w-full  min-w-[1200px]
           rounded-2xl
           border border-white/20
-          ${scrolled ? "bg-white/70" : "bg-white/45"}
           backdrop-blur-xl
           transition-all duration-300
         `}

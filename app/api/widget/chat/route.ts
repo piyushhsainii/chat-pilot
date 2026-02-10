@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   const bot = await validateBot(
     botId,
     req.headers.get("origin") || req.headers.get("referer"),
+    req.nextUrl.hostname,
   );
   if (!bot) {
     return new NextResponse("Unauthorized", { status: 403 });

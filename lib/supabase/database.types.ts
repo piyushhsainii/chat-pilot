@@ -386,6 +386,8 @@ export type Database = {
           created_at: string | null
           greeting_message: string | null
           id: string
+          launcher_surface: string | null
+          panel_surface: string | null
           primary_color: string | null
           text_color: string | null
           theme: string | null
@@ -397,6 +399,8 @@ export type Database = {
           created_at?: string | null
           greeting_message?: string | null
           id?: string
+          launcher_surface?: string | null
+          panel_surface?: string | null
           primary_color?: string | null
           text_color?: string | null
           theme?: string | null
@@ -408,6 +412,8 @@ export type Database = {
           created_at?: string | null
           greeting_message?: string | null
           id?: string
+          launcher_surface?: string | null
+          panel_surface?: string | null
           primary_color?: string | null
           text_color?: string | null
           theme?: string | null

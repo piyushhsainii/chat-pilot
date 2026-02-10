@@ -106,9 +106,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script
+        {/* <script
           src="http://localhost:3000/widget.js"
           data-bot-id="4eba205e-7424-40fe-9b46-66f386c08773"
+          defer
+        ></script> */}
+        <script
+          src="http://localhost:3000/widget.js"
+          data-bot-id="38fcdfb6-a8b6-44f4-89a2-3c0116df8816"
+          data-base-url="http://localhost:3000"
+          data-launcher-surface="liquid"
+          data-panel-surface="solid"
           defer
         ></script>
         <meta name="google-site-verification" content="NyaInzo49We9F1XvJlyGk4nKfW4LcdAwBp9iOogBm0A" />

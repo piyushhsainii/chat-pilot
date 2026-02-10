@@ -1,30 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-function hostnameFromUrlLike(value?: string | null): string | null {
-  if (!value) return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-  try {
-    return new URL(raw).hostname.toLowerCase();
-  } catch {
-    try {
-      return new URL(`http://${raw}`).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-}
-
-function isAllowedHostname(hostname: string, allowed: string[]) {
-  const h = hostname.toLowerCase();
-  return allowed.some((raw) => {
-    const a = hostnameFromUrlLike(raw);
-    if (!a) return false;
-    return h === a || h.endsWith(`.${a}`);
-  });
-}
+import {
+  hasLocalhostInAllowedDomains,
+  hostnameFromUrlLike,
+  isHostnameAllowed,
+  isLocalhostHostname,
+} from "@/lib/bot/allowedDomains";
 
 function extractSupabaseStorageObject(urlRaw: string): { bucket: string; path: string } | null {
   try {
@@ -88,11 +70,16 @@ export async function GET(req: Request) {
       req.headers.get("origin") || req.headers.get("referer"),
     );
 
+     const allowLocalhost = hasLocalhostInAllowedDomains(allowedDomains);
+     const isLocalDevServer = allowLocalhost && isLocalhostHostname(serverHostname);
+
     const ok =
-      !!reqHostname &&
-      (reqHostname === serverHostname ||
-        reqHostname.endsWith(`.${serverHostname}`) ||
-        isAllowedHostname(reqHostname, allowedDomains));
+      (!!reqHostname &&
+        (reqHostname === serverHostname ||
+          reqHostname.endsWith(`.${serverHostname}`) ||
+          (allowLocalhost && isLocalhostHostname(reqHostname)) ||
+          isHostnameAllowed(reqHostname, allowedDomains))) ||
+      (!reqHostname && isLocalDevServer);
 
     if (!ok) {
       return NextResponse.json({ error: "Unauthorized origin" }, { status: 403 });
@@ -151,6 +138,8 @@ export async function GET(req: Request) {
       primary_color: widget?.primary_color,
       button_color: widget?.button_color,
       text_color: widget?.text_color,
+      launcher_surface: (widget as any)?.launcher_surface ?? null,
+      panel_surface: (widget as any)?.panel_surface ?? null,
     },
     limits: {
       rate_limit: settings?.rate_limit ?? 60,

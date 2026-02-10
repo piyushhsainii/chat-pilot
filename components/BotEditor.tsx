@@ -188,7 +188,7 @@ const BotEditor: React.FC<BotEditorProps> = ({ bot, onSave, onClose }) => {
               </p>
               <div className="bg-black/50 p-6 rounded-2xl border border-white/10 relative group">
                 <code className="text-xs text-white font-mono break-all leading-relaxed block">
-                  {`<script\n  src="https://knova.ai/v1/widget.js"\n  data-bot-id="${bot.id}"\n  defer\n></script>`}
+                  {`<script\n  src="${process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_URL ?? "https://knova.ai"}/v1/widget.js"\n  data-bot-id="${bot.id}"\n  data-base-url="${process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_URL ?? "https://knova.ai"}"\n  defer\n></script>`}
                 </code>
                 <button className="absolute top-4 right-4 text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100">Copy</button>
               </div>

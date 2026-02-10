@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BotWithRelations } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Message = {
   role: "user" | "bot";
@@ -570,14 +571,22 @@ export const Playground = ({
               <InfoTip text="These are the files and documents your bot can use as references when answering questions." />
             </div>
 
-            <div className="mt-1 text-xs font-semibold text-slate-700">
-              {knowledgeLoading
-                ? "Loading files…"
-                : knowledgeSources.length
-                  ? `${knowledgeSources.length} file${
-                      knowledgeSources.length === 1 ? "" : "s"
-                    } connected`
-                  : "No files connected"}
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <div className="text-xs font-semibold text-slate-700">
+                {knowledgeLoading
+                  ? "Loading files…"
+                  : knowledgeSources.length
+                    ? `${knowledgeSources.length} file${
+                        knowledgeSources.length === 1 ? "" : "s"
+                      } connected`
+                    : "No files connected"}
+              </div>
+              <Link
+                href={`/dashboard/knowledge?botId=${encodeURIComponent(selectedBot.id)}`}
+                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
+              >
+                Manage →
+              </Link>
             </div>
 
             {knowledgeSources.length ? (
