@@ -9,7 +9,7 @@ export const metadata = {
 export default function TermsOfServicePage() {
   return (
     <div className="relative">
-      <Navbar scrolled={true} />
+      {/* <Navbar scrolled={true} /> */}
 
       <main className="relative pt-24 sm:pt-28">
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
